@@ -6,6 +6,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -105,6 +106,7 @@ def create_app(
     for module in (system, providers, models, chat, conversations, infrastructure, benchmarks):
         app.include_router(module.router)
 
+    _document_stream_events(app)
     if cfg.server.serve_web_dir:
         _mount_web(app, Path(cfg.server.serve_web_dir))
     return app
@@ -124,3 +126,45 @@ def _mount_web(app: FastAPI, web_dir: Path) -> None:
         if path and candidate.is_file() and candidate.is_relative_to(web_dir.resolve()):
             return FileResponse(candidate)
         return FileResponse(index)
+
+
+def _document_stream_events(app: FastAPI) -> None:
+    """Add the SSE event payload schemas to the OpenAPI components.
+
+    SSE bodies are not JSON responses, so FastAPI cannot infer them; publishing them keeps
+    the generated TypeScript SDK's event types in sync with the server.
+    """
+    from pydantic import BaseModel
+    from pydantic.json_schema import models_json_schema
+
+    from omf.core.domain.events import (
+        MessageCompleted,
+        MessageDelta,
+        MessageStarted,
+        RequestFailed,
+        UsageReported,
+    )
+
+    default_openapi = app.openapi
+
+    def openapi() -> dict[str, Any]:
+        if app.openapi_schema:
+            return app.openapi_schema
+        schema = default_openapi()
+        models: list[type[BaseModel]] = [
+            MessageStarted,
+            MessageDelta,
+            UsageReported,
+            MessageCompleted,
+            RequestFailed,
+        ]
+        _, defs = models_json_schema(
+            [(m, "serialization") for m in models], ref_template="#/components/schemas/{model}"
+        )
+        components = schema.setdefault("components", {}).setdefault("schemas", {})
+        for name, definition in defs.get("$defs", {}).items():
+            components.setdefault(name, definition)
+        app.openapi_schema = schema
+        return schema
+
+    app.openapi = openapi  # type: ignore[method-assign]

@@ -216,6 +216,10 @@ class AppConfig(_Strict):
         for pid in [*r.preferred_provider_ids, *r.fallback_provider_ids]:
             if pid not in provider_ids:
                 raise ValueError(f"routing references unknown provider {pid!r}")
+        if r.mode.value == "explicit":
+            raise ValueError(
+                "inference.routing.mode 'explicit' is per request (provider_id), not a policy"
+            )
         if r.fallback_provider_ids and not r.allow_cross_provider_fallback:
             raise ValueError(
                 "routing.fallback_provider_ids requires allow_cross_provider_fallback: true"

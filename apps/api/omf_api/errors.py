@@ -15,10 +15,10 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from omf.core.domain import errors as e
+from omf.core.domain.base import DomainModel
 from omf_api.context import current_request_id
 
 log = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ def status_for(error: e.OMFError) -> int:
     return 500
 
 
-class ErrorDetail(BaseModel):
+class ErrorDetail(DomainModel):
     code: str
     message: str
     request_id: str | None
@@ -64,7 +64,7 @@ class ErrorDetail(BaseModel):
     details: dict[str, Any] = {}
 
 
-class ErrorResponse(BaseModel):
+class ErrorResponse(DomainModel):
     error: ErrorDetail
 
 

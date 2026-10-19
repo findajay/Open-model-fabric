@@ -29,8 +29,7 @@ import statistics
 import time
 from typing import Any
 
-from pydantic import BaseModel
-
+from omf.core.domain.base import DomainModel
 from omf.core.domain.errors import BenchmarkNotFound, OMFError, ValidationFailed
 from omf.core.domain.events import StreamEventType
 from omf.core.domain.models import (
@@ -55,12 +54,12 @@ from omf.core.services.provider_registry import ProviderRegistry
 log = logging.getLogger(__name__)
 
 
-class BenchmarkPrompt(BaseModel):
+class BenchmarkPrompt(DomainModel):
     id: str
     text: str
 
 
-class BenchmarkDataset(BaseModel):
+class BenchmarkDataset(DomainModel):
     id: str
     version: str
     description: str
@@ -113,7 +112,7 @@ DATASETS: dict[str, BenchmarkDataset] = {
 }
 
 
-class BenchmarkRequest(BaseModel):
+class BenchmarkRequest(DomainModel):
     name: str
     dataset_id: str = "smoke"
     targets: list[BenchmarkTarget]

@@ -59,7 +59,10 @@ class ConversationRepository(ABC):
     ) -> Conversation | None: ...
 
     @abstractmethod
-    async def list_conversations(self, *, limit: int = 50) -> list[Conversation]: ...
+    async def list_conversations(
+        self, *, limit: int = 50, owner: str | None = None
+    ) -> list[Conversation]:
+        """Newest first; ``owner`` restricts to one principal's conversations."""
 
     @abstractmethod
     async def append_messages(self, conversation_id: str, messages: list[ChatMessage]) -> None: ...

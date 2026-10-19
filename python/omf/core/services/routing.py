@@ -34,6 +34,7 @@ from omf.core.domain.errors import (
     OMFError,
     PolicyViolation,
     ProviderDisabled,
+    ProviderUnavailable,
 )
 from omf.core.domain.models import (
     DeploymentState,
@@ -189,7 +190,7 @@ class Router:
         if not explicit and policy is not None and policy.respect_health:
             health = self._health.get(provider_id)
             if health.status == HealthStatus.DOWN:
-                raise ProviderDisabled(
+                raise ProviderUnavailable(
                     f"provider {provider_id!r} is currently down ({health.message})",
                     details={"provider_id": provider_id, "health": health.status.value},
                 )

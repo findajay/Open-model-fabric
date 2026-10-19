@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 
+from omf.core.domain.base import DomainModel
 from omf.core.domain.capabilities import Capability
 from omf.core.domain.models import (
     SLUG_PATTERN,
@@ -30,11 +31,11 @@ from omf_api.context import current_request_id
 T = TypeVar("T")
 
 
-class Meta(BaseModel):
+class Meta(DomainModel):
     request_id: str | None = None
 
 
-class Envelope(BaseModel, Generic[T]):
+class Envelope(DomainModel, Generic[T]):
     data: T
     meta: Meta = Field(default_factory=Meta)
 
@@ -46,7 +47,7 @@ def ok(data: T) -> Envelope[T]:
 # ---------------------------------------------------------------------- chat
 
 
-class ChatMessageIn(BaseModel):
+class ChatMessageIn(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     role: Role
@@ -56,7 +57,7 @@ class ChatMessageIn(BaseModel):
     )
 
 
-class ChatRequest(BaseModel):
+class ChatRequest(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     messages: list[ChatMessageIn] = Field(min_length=1, max_length=200)
@@ -91,7 +92,7 @@ class ChatRequest(BaseModel):
         return [ChatMessage(role=m.role, content=m.content) for m in self.messages]
 
 
-class CancelResult(BaseModel):
+class CancelResult(DomainModel):
     request_id: str
     cancelled: bool
 
@@ -99,7 +100,7 @@ class CancelResult(BaseModel):
 # ---------------------------------------------------------------------- providers
 
 
-class ProviderView(BaseModel):
+class ProviderView(DomainModel):
     """A provider as exposed over the API. Contains secret *references* only."""
 
     id: str
@@ -119,7 +120,7 @@ class ProviderView(BaseModel):
     is_default: bool
 
 
-class ProviderCreate(BaseModel):
+class ProviderCreate(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(pattern=SLUG_PATTERN)
@@ -137,7 +138,7 @@ class ProviderCreate(BaseModel):
         return ProviderDefinition(**self.model_dump(), origin="runtime")
 
 
-class ProviderUpdate(BaseModel):
+class ProviderUpdate(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     display_name: str | None = None
@@ -150,7 +151,7 @@ class ProviderUpdate(BaseModel):
     config: dict[str, Any] | None = None
 
 
-class ProviderTestRequest(BaseModel):
+class ProviderTestRequest(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     provider_id: str | None = Field(default=None, description="Test an existing provider")
@@ -159,7 +160,7 @@ class ProviderTestRequest(BaseModel):
     )
 
 
-class ProviderMutationResult(BaseModel):
+class ProviderMutationResult(DomainModel):
     provider: ProviderView
     warnings: list[str]
 
@@ -167,12 +168,12 @@ class ProviderMutationResult(BaseModel):
 # ---------------------------------------------------------------------- models
 
 
-class ModelDetail(BaseModel):
+class ModelDetail(DomainModel):
     definition: ModelDefinition
     deployments: list[ModelDeployment]
 
 
-class ModelCreate(BaseModel):
+class ModelCreate(DomainModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/-]*$")
@@ -189,7 +190,7 @@ class ModelCreate(BaseModel):
     license: dict[str, Any] | None = None
 
 
-class VerifyRequest(BaseModel):
+class VerifyRequest(DomainModel):
     provider_id: str
     model: str
 
@@ -197,18 +198,18 @@ class VerifyRequest(BaseModel):
 # ---------------------------------------------------------------------- conversations
 
 
-class ConversationCreate(BaseModel):
+class ConversationCreate(DomainModel):
     title: str = Field(default="New conversation", max_length=200)
 
 
-class ConversationUpdate(BaseModel):
+class ConversationUpdate(DomainModel):
     title: str = Field(min_length=1, max_length=200)
 
 
 # ---------------------------------------------------------------------- dashboard
 
 
-class ProviderStats(BaseModel):
+class ProviderStats(DomainModel):
     provider_id: str
     requests: int
     errors: int
@@ -219,12 +220,12 @@ class ProviderStats(BaseModel):
     mean_tokens_per_second: float | None
 
 
-class MetricsSummary(BaseModel):
+class MetricsSummary(DomainModel):
     window_requests: int
     providers: list[ProviderStats]
 
 
-class SystemInfo(BaseModel):
+class SystemInfo(DomainModel):
     name: str = "Open Model Fabric"
     version: str
     profile: str
@@ -235,6 +236,6 @@ class SystemInfo(BaseModel):
     adapters: list[str]
 
 
-class OperationResult(BaseModel):
+class OperationResult(DomainModel):
     ok: bool
     message: str | None = None

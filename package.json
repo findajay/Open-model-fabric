@@ -1,0 +1,19 @@
+{
+  "name": "open-model-fabric",
+  "private": true,
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@10.18.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/** --filter ./apps/** build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"packages/sdk-typescript/src/**/*.ts\" \"examples/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"packages/sdk-typescript/src/**/*.ts\" \"examples/**/*.{ts,tsx}\"",
+    "sdk:generate": "pnpm --filter @omf/sdk generate"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}
