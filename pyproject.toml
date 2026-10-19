@@ -1,0 +1,107 @@
+[project]
+name = "open-model-fabric"
+version = "0.1.0"
+description = "Provider-neutral, open-source AI application platform: inference gateway, model registry and pluggable infrastructure adapters."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+authors = [{ name = "Open Model Fabric contributors" }]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Framework :: FastAPI",
+]
+# Runtime dependencies are pinned for repeatable builds; uv.lock pins the full tree.
+dependencies = [
+  "fastapi==0.149.0",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.14.1",
+  "httpx==0.28.1",
+  "pyyaml==6.0.3",
+  "sqlalchemy==2.1.5",
+  "alembic==1.20.0",
+  "anyio==4.15.1",
+  "python-multipart==0.0.32",
+]
+
+[project.optional-dependencies]
+# Google Drive artifact storage (service-account auth). The adapter talks to the
+# Drive v3 REST API with httpx; google-auth is only used to mint access tokens.
+gdrive = ["google-auth==2.62.0", "requests==2.34.2"]
+# S3-compatible artifact storage (AWS S3, MinIO, ...).
+s3 = ["boto3==1.43.115"]
+# PostgreSQL metadata repository.
+postgres = ["psycopg[binary]==3.3.6"]
+# Optional OpenTelemetry exporter.
+otel = [
+  "opentelemetry-api==1.45.1",
+  "opentelemetry-sdk==1.45.1",
+  "opentelemetry-exporter-otlp-proto-http==1.45.1",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.1.1",
+  "pytest-asyncio==1.4.0",
+  "pytest-cov==7.1.0",
+  "ruff==0.17.1",
+  "mypy==2.4.0",
+  "types-PyYAML==6.0.12.20260906",
+  "moto[s3]==5.2.4",
+  "nbformat==5.11.1",
+  "pip-audit==2.10.1",
+]
+
+[project.scripts]
+omf-api = "omf_api.__main__:main"
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["python/omf", "apps/api/omf_api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["python", "apps/api", "."]
+markers = [
+  "postgres: requires a PostgreSQL server (OMF_TEST_POSTGRES_URL)",
+  "notebook: executes the Colab notebook in smoke mode (needs torch + transformers)",
+]
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["python", "apps/api", "tests"]
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "SIM", "PT"]
+ignore = [
+  "S101",   # assert is fine in tests
+  "RUF012", # pydantic class vars
+  "S311",   # random is used for jitter, not crypto
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "B017", "PT011", "PT018", "PT012"]
+"scripts/**" = ["S"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = ["python", "apps/api"]
+packages = ["omf", "omf_api"]
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["google.*", "boto3.*", "botocore.*", "opentelemetry.*", "moto.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["python/omf", "apps/api/omf_api"]
