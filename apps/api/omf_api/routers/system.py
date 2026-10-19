@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -99,9 +99,18 @@ async def recent_requests(
 
 @router.get("/metrics/summary", summary="Per-provider latency and error statistics")
 async def metrics_summary(
-    c: ContainerDep, _p: UserDep, window: int = 500
+    c: ContainerDep,
+    _p: UserDep,
+    window: int = 500,
+    operation: Literal["chat", "embeddings"] = "chat",
 ) -> Envelope[MetricsSummary]:
-    records = await c.metadata.recent_records(limit=max(1, min(window, 5000)))
+    """Statistics over the last ``window`` records of one operation (chat by default, so
+    embedding latencies do not distort chat latency percentiles)."""
+    records = [
+        r
+        for r in await c.metadata.recent_records(limit=max(1, min(window, 5000)))
+        if r.operation == operation
+    ]
     by_provider: dict[str, list[InferenceRecord]] = defaultdict(list)
     for r in records:
         by_provider[r.provider_id or "unrouted"].append(r)

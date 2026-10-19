@@ -2,7 +2,8 @@
 
 It implements the subset of the Ollama REST API that Open Model Fabric uses — ``GET
 /api/version``, ``GET /api/tags``, ``POST /api/show``, ``POST /api/chat`` (JSON and
-NDJSON streaming) — with response shapes taken from the Ollama API documentation.
+NDJSON streaming), ``POST /api/embed`` — with response shapes taken from the Ollama API
+documentation. Embeddings are deterministic pseudo-vectors, not model output.
 
 It does NOT run a language model: replies are deterministic text. It exists so that the
 adapter and the end-to-end provider-switching demo can be exercised where a real Ollama
@@ -86,6 +87,16 @@ def _reply(model: str, body: dict[str, Any]) -> str:
         return json.dumps({"engine": "ollama-emulator", "model": model, "echo": prompt[:100]})
     suffix = f" I also received {images} image(s)." if images else ""
     return f"Ollama emulator ({model}) received: {prompt}.{suffix} This is not a real model."
+
+
+def fake_vector(text: str, dims: int) -> list[float]:
+    """Deterministic pseudo-embedding (not semantic): stable per text, unit length."""
+    import hashlib
+    import math
+
+    raw = [b / 255 - 0.5 for b in hashlib.sha256(text.encode()).digest() * (dims // 32 + 1)]
+    norm = math.sqrt(sum(x * x for x in raw[:dims])) or 1.0
+    return [round(x / norm, 6) for x in raw[:dims]]
 
 
 def _words(text: str) -> list[str]:
@@ -201,12 +212,38 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
             until_disconnect(request, gen(), aborted), media_type="application/x-ndjson"
         )
 
+    async def embed(request: Request) -> Response:
+        body = await request.json()
+        st.requests.append(body)
+        if st.fail_with_status:
+            return JSONResponse({"error": "emulated failure"}, status_code=st.fail_with_status)
+        model = body.get("model")
+        if model not in MODELS:
+            return JSONResponse({"error": f"model '{model}' not found"}, status_code=404)
+        if "embedding" not in MODELS[model]["capabilities"]:
+            return JSONResponse(
+                {"error": "this model does not support embeddings"}, status_code=400
+            )
+        inputs = body.get("input")
+        texts = [inputs] if isinstance(inputs, str) else list(inputs or [])
+        dims = int(body.get("dimensions") or 768)
+        return JSONResponse(
+            {
+                "model": model,
+                "embeddings": [fake_vector(t, dims) for t in texts],
+                "total_duration": 1,
+                "load_duration": 1,
+                "prompt_eval_count": sum(len(t.split()) for t in texts),
+            }
+        )
+
     app = Starlette(
         routes=[
             Route("/api/version", version),
             Route("/api/tags", tags),
             Route("/api/show", show, methods=["POST"]),
             Route("/api/chat", chat, methods=["POST"]),
+            Route("/api/embed", embed, methods=["POST"]),
         ]
     )
     app.state.emulator = st

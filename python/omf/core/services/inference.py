@@ -46,6 +46,9 @@ from omf.core.domain.events import (
 from omf.core.domain.models import (
     ChatMessage,
     Conversation,
+    Embedding,
+    EmbeddingRequest,
+    EmbeddingResponse,
     GenerationParams,
     InferenceRecord,
     InferenceRequest,
@@ -87,6 +90,17 @@ class ChatCommand:
     owner: str | None = None
     """Principal making the request; conversations are scoped to their owner."""
     owner_is_admin: bool = False
+
+
+@dataclass
+class EmbedCommand:
+    inputs: list[str]
+    provider_id: str | None = None
+    model: str | None = None
+    dimensions: int | None = None
+    sensitivity: Sensitivity = Sensitivity.NORMAL
+    request_id: str = field(default_factory=lambda: new_id("emb"))
+    record: bool = True
 
 
 def estimate_tokens(text: str) -> int:
@@ -209,6 +223,125 @@ class InferenceService:
             sensitivity=cmd.sensitivity,
             default_model=self._settings.current.default_model,
         )
+
+    async def embed(self, cmd: EmbedCommand) -> EmbeddingResponse:
+        """Embed ``cmd.inputs`` with a model that declares the ``embeddings`` capability.
+
+        Embeddings have no side effects, so retryable failures may move to the next
+        candidate whenever the routing policy allows fallback.
+        """
+        started = time.perf_counter()
+        plan: RoutePlan | None = None
+        attempts: list[RouteAttempt] = []
+        try:
+            plan = await self._router.plan(
+                RouteRequest(
+                    provider_id=cmd.provider_id,
+                    model=cmd.model,
+                    required={Capability.EMBEDDINGS},
+                    sensitivity=cmd.sensitivity,
+                    default_model=None,  # the default model is a chat model
+                ),
+                self._settings.routing_policy(),
+            )
+            attempts = list(plan.considered)
+            last_error: OMFError | None = None
+            for index, deployment in enumerate(plan.candidates[: plan.max_attempts]):
+                request = EmbeddingRequest(
+                    request_id=cmd.request_id,
+                    model=deployment.provider_model,
+                    inputs=cmd.inputs,
+                    dimensions=cmd.dimensions,
+                )
+                call_started = time.perf_counter()
+                try:
+                    timeout = self._timeout(deployment.provider_id)
+                    async with self._providers.lease(deployment.provider_id) as adapter:
+                        async with asyncio.timeout(timeout):
+                            result = await adapter.embed(request)
+                except TimeoutError:
+                    last_error = ProviderTimeout(
+                        f"provider {deployment.provider_id!r} exceeded {timeout}s",
+                        details={"provider_id": deployment.provider_id},
+                    )
+                except OMFError as exc:
+                    last_error = exc
+                else:
+                    total_ms = (time.perf_counter() - call_started) * 1000
+                    self._health.record_success(deployment.provider_id, total_ms)
+                    attempts.append(
+                        RouteAttempt(
+                            provider_id=deployment.provider_id,
+                            model=deployment.provider_model,
+                            outcome="succeeded",
+                        )
+                    )
+                    usage = result.usage or TokenUsage(
+                        prompt_tokens=sum(estimate_tokens(t) for t in cmd.inputs),
+                        source="estimated",
+                    )
+                    timings = Timings(total_ms=round(total_ms, 2))
+                    await self._record(
+                        cmd,
+                        RequestStatus.COMPLETED,
+                        deployment,
+                        plan,
+                        len(attempts),
+                        timings,
+                        usage,
+                        None,
+                        streaming=False,
+                    )
+                    return EmbeddingResponse(
+                        request_id=cmd.request_id,
+                        provider_id=deployment.provider_id,
+                        model=deployment.provider_model,
+                        model_id=deployment.model_id,
+                        data=[
+                            Embedding(index=i, embedding=v) for i, v in enumerate(result.vectors)
+                        ],
+                        dimensions=len(result.vectors[0]),
+                        usage=usage,
+                        timings=timings,
+                        route=RouteDecision(
+                            policy=plan.mode.value,
+                            provider_id=deployment.provider_id,
+                            model=deployment.provider_model,
+                            model_id=deployment.model_id,
+                            attempts=attempts,
+                        ),
+                    )
+                assert last_error is not None
+                if not isinstance(last_error, OperationNotSupported):
+                    self._health.record_failure(deployment.provider_id, last_error)
+                attempts.append(
+                    RouteAttempt(
+                        provider_id=deployment.provider_id,
+                        model=deployment.provider_model,
+                        outcome="failed",
+                        reason=last_error.message,
+                        error_code=last_error.code,
+                    )
+                )
+                is_last = index >= min(len(plan.candidates), plan.max_attempts) - 1
+                if not last_error.retryable or is_last:
+                    break
+            assert last_error is not None
+            last_error.details.setdefault("attempts", [a.model_dump() for a in attempts])
+            raise last_error
+        except OMFError as exc:
+            await self._record(
+                cmd,
+                RequestStatus.FAILED,
+                None,
+                plan,
+                len(attempts),
+                Timings(total_ms=(time.perf_counter() - started) * 1000),
+                None,
+                exc.code,
+                streaming=False,
+            )
+            raise
 
     async def cancel(
         self, request_id: str, *, owner: str | None = None, is_admin: bool = True
@@ -662,7 +795,7 @@ class InferenceService:
 
     async def _record(
         self,
-        cmd: ChatCommand,
+        cmd: ChatCommand | EmbedCommand,
         status: RequestStatus,
         deployment: ModelDeployment | None,
         plan: RoutePlan | None,
@@ -675,7 +808,9 @@ class InferenceService:
     ) -> None:
         provider_id = deployment.provider_id if deployment else (cmd.provider_id or None)
         model = deployment.provider_model if deployment else cmd.model
+        operation = "embeddings" if isinstance(cmd, EmbedCommand) else "chat"
         attrs = {
+            "operation": operation,
             "provider_id": provider_id or "none",
             "model": model or "none",
             "status": status.value,
@@ -706,7 +841,7 @@ class InferenceService:
                 attributes={**attrs, "error_code": error_code or "unknown"},
             )
         self._telemetry.record_trace(
-            "omf.chat",
+            f"omf.{operation}",
             duration_ms=timings.total_ms,
             status="ok" if status == RequestStatus.COMPLETED else "error",
             attributes={**attrs, "request_id": cmd.request_id},
@@ -717,6 +852,7 @@ class InferenceService:
             await self._records.add_record(
                 InferenceRecord(
                     request_id=cmd.request_id,
+                    operation=operation,
                     provider_id=provider_id,
                     model=model,
                     status=status,

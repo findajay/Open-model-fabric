@@ -61,6 +61,8 @@ class DockerComputeConfig(ManagedComputeConfig):
     registry_auth_ref: SecretRefStr | None = None
     """Secret holding the registry auth JSON ({"username", "password", "serveraddress"})."""
     stop_timeout_s: int = Field(default=30, ge=0, le=600)
+    pull_policy: Literal["if_not_present", "always"] = "if_not_present"
+    """Pull only when the image is missing (as Kubernetes does for pinned tags)."""
 
     @field_validator("container_name")
     @classmethod
@@ -286,7 +288,12 @@ class DockerComputeAdapter(ManagedComputeAdapter):
         if existing is not None:
             self._owned_or_conflict(existing)
             return  # idempotent
-        await self._pull()
+        image_path = f"/images/{quote(self.cfg.image, safe='/:@')}/json"
+        if (
+            self.cfg.pull_policy == "always"
+            or await self.api.request("GET", image_path, allow_404=True) is None
+        ):
+            await self._pull()
         await self.api.request(
             "POST",
             "/containers/create",

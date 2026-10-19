@@ -184,6 +184,7 @@ class ProviderOperation(StrEnum):
     STREAM_GENERATE = "stream_generate"
     HEALTH_CHECK = "health_check"
     CANCEL = "cancel"  # optional
+    EMBED = "embed"  # optional
 
 
 MANDATORY_INFERENCE_OPERATIONS = frozenset(
@@ -451,6 +452,21 @@ class GenerationResult(DomainModel):
     usage: TokenUsage | None = None
 
 
+class EmbeddingRequest(DomainModel):
+    """An embeddings request as seen by an adapter: already routed to one provider/model."""
+
+    request_id: str
+    model: str  # provider-native model name
+    inputs: list[str] = Field(min_length=1)
+    dimensions: int | None = Field(default=None, gt=0)
+
+
+class EmbeddingResult(DomainModel):
+    vectors: list[list[float]]
+    """One vector per input, in input order."""
+    usage: TokenUsage | None = None
+
+
 class Timings(DomainModel):
     total_ms: float
     ttft_ms: float | None = None
@@ -486,10 +502,28 @@ class InferenceResponse(DomainModel):
     conversation_id: str | None = None
 
 
+class Embedding(DomainModel):
+    index: int
+    embedding: list[float]
+
+
+class EmbeddingResponse(DomainModel):
+    request_id: str
+    provider_id: str
+    model: str
+    model_id: str | None = None
+    data: list[Embedding]
+    dimensions: int
+    usage: TokenUsage | None = None
+    timings: Timings
+    route: RouteDecision
+
+
 class InferenceRecord(DomainModel):
     """Observability record for one request. Never contains prompt or completion text."""
 
     request_id: str
+    operation: Literal["chat", "embeddings"] = "chat"
     provider_id: str | None
     model: str | None
     status: RequestStatus

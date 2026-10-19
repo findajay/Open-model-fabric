@@ -331,6 +331,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/embeddings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Embed texts with a model that declares the embeddings capability */
+        post: operations["create_embeddings_api_v1_embeddings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/health/providers": {
         parameters: {
             query?: never;
@@ -355,7 +372,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Per-provider latency and error statistics */
+        /**
+         * Per-provider latency and error statistics
+         * @description Statistics over the last ``window`` records of one operation (chat by default, so
+         *     embedding latencies do not distort chat latency percentiles).
+         */
         get: operations["metrics_summary_api_v1_metrics_summary_get"];
         put?: never;
         post?: never;
@@ -1153,6 +1174,56 @@ export interface components {
          * @enum {string}
          */
         DeploymentState: "available" | "unavailable" | "unknown";
+        /** Embedding */
+        Embedding: {
+            /** Embedding */
+            embedding: number[];
+            /** Index */
+            index: number;
+        };
+        /** EmbeddingResponse */
+        EmbeddingResponse: {
+            /** Data */
+            data: components["schemas"]["Embedding"][];
+            /** Dimensions */
+            dimensions: number;
+            /** Model */
+            model: string;
+            /** Model Id */
+            model_id: string | null;
+            /** Provider Id */
+            provider_id: string;
+            /** Request Id */
+            request_id: string;
+            route: components["schemas"]["RouteDecision"];
+            timings: components["schemas"]["Timings"];
+            usage: components["schemas"]["TokenUsage"] | null;
+        };
+        /** EmbeddingsRequest */
+        EmbeddingsRequest: {
+            /**
+             * Dimensions
+             * @description Requested vector size (model-dependent)
+             */
+            dimensions?: number | null;
+            /**
+             * Input
+             * @description Text or list of texts (up to 256) to embed; one vector per text
+             */
+            input: string | string[];
+            /**
+             * Model
+             * @description Provider-native model name or catalog model id; default: the first model that declares the embeddings capability
+             */
+            model?: string | null;
+            /**
+             * Provider Id
+             * @description Explicit provider; disables fallback
+             */
+            provider_id?: string | null;
+            /** @default normal */
+            sensitivity?: components["schemas"]["Sensitivity"];
+        };
         /** EndpointInfo */
         EndpointInfo: {
             /** Authorized */
@@ -1184,6 +1255,11 @@ export interface components {
         /** Envelope[Conversation] */
         Envelope_Conversation_: {
             data: components["schemas"]["Conversation"];
+            meta: components["schemas"]["Meta"];
+        };
+        /** Envelope[EmbeddingResponse] */
+        Envelope_EmbeddingResponse_: {
+            data: components["schemas"]["EmbeddingResponse"];
             meta: components["schemas"]["Meta"];
         };
         /** Envelope[InferenceResponse] */
@@ -1479,6 +1555,12 @@ export interface components {
             latency_ms: number | null;
             /** Model */
             model: string | null;
+            /**
+             * Operation
+             * @default chat
+             * @enum {string}
+             */
+            operation: "chat" | "embeddings";
             /** Prompt Tokens */
             prompt_tokens: number | null;
             /** Provider Id */
@@ -1783,7 +1865,7 @@ export interface components {
          * ProviderOperation
          * @enum {string}
          */
-        ProviderOperation: "list_models" | "get_capabilities" | "generate" | "stream_generate" | "health_check" | "cancel";
+        ProviderOperation: "list_models" | "get_capabilities" | "generate" | "stream_generate" | "health_check" | "cancel" | "embed";
         /** ProviderStats */
         ProviderStats: {
             /** Error Rate */
@@ -2862,6 +2944,39 @@ export interface operations {
             };
         };
     };
+    create_embeddings_api_v1_embeddings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmbeddingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_EmbeddingResponse_"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     provider_health_api_v1_health_providers_get: {
         parameters: {
             query?: {
@@ -2897,6 +3012,7 @@ export interface operations {
         parameters: {
             query?: {
                 window?: number;
+                operation?: "chat" | "embeddings";
             };
             header?: never;
             path?: never;

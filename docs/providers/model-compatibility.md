@@ -22,9 +22,10 @@ tested, so benchmark runs record it.
 
 Notes:
 
-- `tool_calling` and `embeddings` can be declared, but OMF's chat API has no tool-call or
-  embedding request shapes yet. An embeddings-only deployment is rejected for chat
-  (`capability_not_supported`).
+- `tool_calling` can be declared, but OMF's chat API has no tool-call request shape yet.
+- `embeddings` deployments are served by `POST /api/v1/embeddings`. An embeddings-only
+  deployment is rejected for chat (`capability_not_supported`) and is not offered in the
+  Playground.
 - The UI and the router only enable `vision_input` when the *deployment* has a claim for
   it. Ollama reports `vision` per model. On OpenAI-compatible servers it must be declared
   in the provider's `models:` list.
@@ -35,7 +36,7 @@ Notes:
 |---|---|---|
 | Engine metadata | `provider_reported` | Ollama `/api/show` → `completion` ⇒ chat + text_generation; `vision` ⇒ vision_input; `tools` ⇒ tool_calling; `embedding` ⇒ embeddings. The list is treated as complete, so catalog declarations cannot add vision to a model Ollama says lacks it. |
 | Adapter defaults | `declared` | OpenAI-compatible: a listed model ⇒ chat + text_generation. Ollama: completion models ⇒ structured_output (`format: json`). Streaming adapters ⇒ streaming for chat-capable deployments. Older Ollama without `capabilities` ⇒ chat + text_generation only. |
-| Provider `models:` declarations | `declared` | `{name: Qwen/Qwen2.5-7B-Instruct, model_id: qwen2.5-7b-instruct, capabilities: [chat, structured_output]}` |
+| Provider `models:` declarations | `declared` | `{name: Qwen/Qwen2.5-7B-Instruct, model_id: qwen2.5-7b-instruct, capabilities: [chat, structured_output]}`. When a model has only adapter defaults, an operator or catalog declaration *replaces* them. So `{name: BAAI/bge-small-en-v1.5, capabilities: [embeddings]}` on an OpenAI-compatible server is not also a chat model. |
 | Catalog entry of the mapped model | `declared` | Matched by `model_id` or `provider_aliases` |
 | Verification probe | `verified` | `POST /api/v1/deployments/verify` |
 
@@ -56,8 +57,10 @@ The probe sends a non-streaming request ("Reply with the single word: OK",
 | Non-streaming request returns text | `chat`, `text_generation` |
 | Streaming request returns deltas | `streaming` |
 | JSON-mode response parses | `structured_output` |
+| Two texts return two equal-length vectors | `embeddings` |
 
-Other claims (vision, tools, embeddings) are reported as `not_probed` and keep their
+Embedding-only models get no chat probe. Other claims (vision, tools) are reported as
+`not_probed` and keep their
 current evidence. Results are persisted and survive restarts. A new probe replaces the
 previous verified set for that deployment.
 

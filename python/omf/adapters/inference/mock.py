@@ -9,7 +9,10 @@ the prompt deterministically. The UI labels it as a mock.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import math
+import re
 import time
 from collections.abc import AsyncGenerator
 from typing import Literal
@@ -23,10 +26,12 @@ from omf.core.domain.capabilities import (
     Evidence,
     Modality,
 )
-from omf.core.domain.errors import ModelNotFound, ProviderUnavailable
+from omf.core.domain.errors import CapabilityNotSupported, ModelNotFound, ProviderUnavailable
 from omf.core.domain.models import (
     AuthRequirement,
     DiscoveredModel,
+    EmbeddingRequest,
+    EmbeddingResult,
     GenerationChunk,
     GenerationResult,
     HealthStatus,
@@ -59,6 +64,8 @@ class MockModelConfig(BaseModel):
             Capability.STRUCTURED_OUTPUT,
         ]
     )
+    dimensions: int = Field(default=64, ge=2, le=4096)
+    """Vector size for models with the ``embeddings`` capability."""
 
 
 def _default_models() -> list[MockModelConfig]:
@@ -68,6 +75,7 @@ def _default_models() -> list[MockModelConfig]:
             name="mock-vision",
             capabilities=[Capability.CHAT, Capability.TEXT_GENERATION, Capability.VISION_INPUT],
         ),
+        MockModelConfig(name="mock-embed", capabilities=[Capability.EMBEDDINGS]),
     ]
 
 
@@ -121,7 +129,10 @@ class MockInferenceAdapter(InferenceProvider):
                             source="mock",
                             checked_at=utcnow(),
                         )
-                        for c in [*m.capabilities, Capability.STREAMING]
+                        for c in [
+                            *m.capabilities,
+                            *([Capability.STREAMING] if Capability.CHAT in m.capabilities else []),
+                        ]
                     )
                 ).normalized(),
                 capabilities_complete=True,
@@ -144,12 +155,7 @@ class MockInferenceAdapter(InferenceProvider):
         self, request: InferenceRequest
     ) -> AsyncGenerator[GenerationChunk, None]:
         self._check_outage()
-        model = self._models.get(request.model)
-        if model is None:
-            raise ModelNotFound(
-                f"mock model {request.model!r} does not exist",
-                details={"available": sorted(self._models)},
-            )
+        self._model(request.model, Capability.CHAT)
         text = self._respond(request)
         tokens = _tokens(text)
         if request.params.max_tokens is not None:
@@ -197,7 +203,32 @@ class MockInferenceAdapter(InferenceProvider):
     async def cancel(self, request_id: str) -> None:
         self._cancelled.add(request_id)
 
+    async def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
+        self._check_outage()
+        model = self._model(request.model, Capability.EMBEDDINGS)
+        dims = request.dimensions or model.dimensions
+        await asyncio.sleep(self._config.first_token_delay_ms / 1000)
+        tokens = sum(len(_tokens(text)) for text in request.inputs)
+        return EmbeddingResult(
+            vectors=[_hashed_embedding(text, dims) for text in request.inputs],
+            usage=TokenUsage(prompt_tokens=tokens, total_tokens=tokens, source="provider"),
+        )
+
     # ------------------------------------------------------------------ internals
+
+    def _model(self, name: str, capability: Capability) -> MockModelConfig:
+        model = self._models.get(name)
+        if model is None:
+            raise ModelNotFound(
+                f"mock model {name!r} does not exist",
+                details={"available": sorted(self._models)},
+            )
+        if capability not in model.capabilities:
+            raise CapabilityNotSupported(
+                f"mock model {name!r} does not support {capability.value}",
+                details={"model": name, "missing": [capability.value]},
+            )
+        return model
 
     def _check_outage(self) -> None:
         if self._config.simulate_outage:
@@ -233,6 +264,21 @@ class MockInferenceAdapter(InferenceProvider):
         return "\n".join(lines)
 
 
+def _hashed_embedding(text: str, dims: int) -> list[float]:
+    """Deterministic bag-of-words feature hashing, L2-normalised.
+
+    Texts that share words get similar vectors, which is enough to demo and test
+    similarity search. It carries no semantics beyond word overlap.
+    """
+    vector = [0.0] * dims
+    for word in re.findall(r"\w+", text.lower()):
+        digest = hashlib.sha256(word.encode()).digest()
+        index = int.from_bytes(digest[:4], "big") % dims
+        vector[index] += 1.0 if digest[4] & 1 else -1.0
+    norm = math.sqrt(sum(v * v for v in vector))
+    return [round(v / norm, 6) for v in vector] if norm else vector
+
+
 CAPABILITIES = ProviderCapabilities(
     adapter_type=ADAPTER_TYPE,
     adapter_version=ADAPTER_VERSION,
@@ -243,6 +289,7 @@ CAPABILITIES = ProviderCapabilities(
         ProviderOperation.STREAM_GENERATE,
         ProviderOperation.HEALTH_CHECK,
         ProviderOperation.CANCEL,
+        ProviderOperation.EMBED,
     ],
     modalities=[Modality.TEXT, Modality.IMAGE],
     streaming=True,
