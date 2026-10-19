@@ -174,6 +174,12 @@ class PermissionDenied(OMFError):
     code = "permission_denied"
 
 
+class LifecycleDisabled(PermissionDenied):
+    """The adapter could change the environment, but the operator has not allowed it."""
+
+    code = "lifecycle_disabled"
+
+
 class SecretNotFound(OMFError):
     code = "secret_not_found"
 
@@ -186,3 +192,9 @@ class ModelUnavailable(OMFError):
     """The model is declared for a provider but the provider does not currently serve it."""
 
     code = "model_unavailable"
+
+
+class ComputeError(OMFError):
+    """A compute backend (Docker, Kubernetes, cloud API) rejected or failed an operation."""
+
+    code = "compute_error"

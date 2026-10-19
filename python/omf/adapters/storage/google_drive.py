@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import random
 import time
 from collections.abc import Awaitable, Callable
@@ -39,12 +38,11 @@ from omf.adapters.storage._common import HashingWriter, spool_and_hash, validate
 from omf.core.domain.errors import (
     ArtifactNotFound,
     ChecksumMismatch,
-    ConfigurationError,
     OMFError,
     StorageError,
 )
 from omf.core.domain.models import HealthStatus, StorageArtifact, StorageStatus
-from omf.core.ports.secrets import SecretRefStr, SecretValue
+from omf.core.ports.secrets import SecretRefStr
 from omf.core.ports.storage import ArtifactStorageProvider, validate_key, validate_prefix
 
 ADAPTER_TYPE = "google_drive"
@@ -64,35 +62,6 @@ class GoogleDriveConfig(BaseModel):
     chunk_size_mb: int = Field(default=8, ge=1, le=256)
     api_base: str = "https://www.googleapis.com"
     timeout_s: float = Field(default=60.0, gt=0, le=600)
-
-
-class ServiceAccountTokenSource:
-    """Mints OAuth access tokens from a service-account JSON using ``google-auth``."""
-
-    def __init__(self, credentials_json: SecretValue, scope: str) -> None:
-        try:
-            from google.oauth2 import service_account
-        except ImportError as exc:  # pragma: no cover - depends on optional extra
-            raise ConfigurationError(
-                "Google Drive storage needs the 'gdrive' extra: "
-                "pip install 'open-model-fabric[gdrive]'"
-            ) from exc
-        try:
-            info = json.loads(credentials_json.reveal())
-        except ValueError as exc:
-            raise ConfigurationError("Google Drive credentials secret is not valid JSON") from exc
-        self._credentials = service_account.Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
-            info, scopes=[scope]
-        )
-        self._lock = asyncio.Lock()
-
-    async def __call__(self) -> str:
-        async with self._lock:
-            if not self._credentials.valid:
-                from google.auth.transport.requests import Request
-
-                await asyncio.to_thread(self._credentials.refresh, Request())
-            return str(self._credentials.token)
 
 
 class GoogleDriveStorageAdapter(ArtifactStorageProvider):

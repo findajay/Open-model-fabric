@@ -43,6 +43,7 @@ STATUS_BY_TYPE: list[tuple[type[e.OMFError], int]] = [
     (e.StorageError, 502),
     (e.PolicyViolation, 403),
     (e.PermissionDenied, 403),
+    (e.ComputeError, 502),
     (e.AuthenticationRequired, 401),
     (e.SecretNotFound, 500),
     (e.ConfigurationError, 500),

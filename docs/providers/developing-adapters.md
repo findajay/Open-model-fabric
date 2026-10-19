@@ -62,11 +62,23 @@ Adapters implement the ports in `python/omf/core/ports` (see
 ## Compute adapters
 
 Subclass `ComputeProvider`. Implement `supported_operations`, `describe_environment`,
-`get_resources` and `get_status`. Implement `provision`, `start` and `stop` only when an
-**authorised, supported** mechanism exists. Otherwise inherit the defaults, which raise
-`OperationNotSupported` (501). Mark resources `source="declared"` when they are not
-detected. Register a factory in `COMPUTE_ADAPTERS` and the config model in
-`describe_component_adapters`.
+`get_resources` and `get_status`. Implement `provision`, `start`, `stop` and
+`deprovision` only when an **authorised, supported** mechanism exists. Otherwise inherit
+the defaults, which raise `OperationNotSupported` (501). Mark resources
+`source="declared"` when they are not detected. Register a factory in `COMPUTE_ADAPTERS`
+and the config model in `COMPUTE_CONFIG_MODELS` (both in `bootstrap/catalog.py`).
+
+Adapters that change infrastructure subclass `ManagedComputeAdapter`
+(`adapters/compute/_managed.py`) and follow [ADR-0012](../architecture/adr/0012-managed-compute-lifecycle.md).
+The base class provides the `allow_lifecycle` opt-in, the per-environment lock,
+endpoint probing through the egress policy, and `wait_for`. A subclass implements:
+
+- `_inspect()`: read-only state, resources and endpoint host;
+- the `_do_*` methods it supports, listed in `implemented`.
+
+Label everything you create with `OWNER_LABEL`/`ENVIRONMENT_LABEL`, and raise `Conflict`
+before you modify a resource that does not carry them (`owned()`). Map backend failures
+to `ComputeError` (502). `_rest.RestClient` does this for JSON/REST APIs.
 
 ## Storage adapters
 
@@ -118,5 +130,10 @@ corruption detection, unsafe keys, files of more than 2 MB, empty files and stat
 | llama.cpp `llama-server` | `openai_compatible` | Supported by protocol; untested live |
 | Hugging Face Inference Endpoints | `openai_compatible` (when the endpoint exposes the OpenAI route) with `api_key_ref` | Untested live |
 | Custom REST model servers | `openai_compatible` if they implement the protocol; otherwise write a dedicated adapter as above | — |
-| Docker, GPU VMs, Kubernetes, AWS, Azure, Google Cloud (compute) | `ComputeProvider` port exists. **No adapters are implemented.** Today, describe such hosts by running the API there (the `local` adapter) and register their inference servers as providers. Lifecycle automation needs new adapters that use each platform's official APIs. | Not implemented |
+| Docker (compute) | `docker` adapter: Engine API over a Unix socket or TCP/TLS; pinned images, named volumes only, GPUs via device requests | Implemented; tested against a real Docker Engine |
+| Kubernetes (compute) | `kubernetes` adapter: an OMF-labelled Deployment + ClusterIP Service, scaled between 0 and `replicas` | Implemented; tested against a fake API server, not a real cluster |
+| AWS EC2 (compute) | `aws_ec2` adapter: launches a tagged instance, or starts/stops a designated one | Implemented; tested against moto, not AWS |
+| Google Compute Engine (compute) | `gcp_compute` adapter: labelled VM with optional GPUs and startup script | Implemented; tested against a fake REST API, not Google Cloud |
+| Azure VMs (compute) | `azure_vm` adapter: start and deallocate an existing VM | Implemented (start/stop only); tested against a fake REST API, not Azure |
+| AWS ECS/Fargate, Cloud Run, Azure Container Apps (compute) | No compute adapter. OMF itself can be hosted on these (see deployment docs); its compute adapters do not manage them. | Not implemented |
 | S3, MinIO, Azure Blob (storage) | `s3` adapter targets S3 and S3-compatible stores such as MinIO (`endpoint_url`, `force_path_style`). It is contract-tested against moto's S3 emulation, not against AWS or MinIO. Azure Blob has no adapter. | S3: implemented; MinIO: by protocol, untested; Azure Blob: not implemented |

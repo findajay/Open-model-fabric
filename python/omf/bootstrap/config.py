@@ -289,6 +289,8 @@ def find_inline_secrets(node: Any, path: str = "") -> list[str]:
             looks_secret = key in _SECRET_KEY_NAMES or key.endswith(_SECRET_SUFFIXES)
             if looks_secret and not key.endswith("_ref") and isinstance(v, str) and v:
                 found.append(here)
+            if key.endswith("_refs") and isinstance(v, dict):
+                continue  # a mapping of names to secret references (validated by its model)
             found.extend(find_inline_secrets(v, here))
     elif isinstance(node, list):
         for i, item in enumerate(node):

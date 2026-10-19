@@ -11,7 +11,12 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from omf.core.domain.errors import ValidationFailed
-from omf.core.domain.models import ComputeEnvironment, StorageArtifact, StorageStatus
+from omf.core.domain.models import (
+    ComputeEnvironment,
+    ComputeOperation,
+    StorageArtifact,
+    StorageStatus,
+)
 from omf.core.ports.storage import validate_key
 from omf_api.deps import ContainerDep
 from omf_api.schemas import Envelope, OperationResult, ok
@@ -40,23 +45,29 @@ async def get_compute(
 
 @router.post(
     "/compute/{environment_id}/{operation}",
-    summary="Lifecycle operation (501 operation_not_supported unless the adapter supports it)",
+    summary="Lifecycle operation (admin). 501 if the adapter cannot, 403 lifecycle_disabled "
+    "unless the environment allows it",
 )
 async def compute_operation(
     environment_id: str,
-    operation: Literal["provision", "start", "stop"],
+    operation: Literal["provision", "start", "stop", "deprovision"],
     c: ContainerDep,
     p: AdminDep,
     request: Request,
+    wait: bool = False,
+    timeout_s: float = Query(default=300.0, gt=0, le=3600),
 ) -> Envelope[ComputeEnvironment]:
-    provider = c.compute.provider(environment_id)
+    c.compute.provider(environment_id)  # 404 before auditing unknown ids
     await c.audit.record(
         actor=p.name,
         action=f"compute.{operation}",
         target=environment_id,
         request_id=request.state.request_id,
+        details={"wait": wait},
     )
-    env = await getattr(provider, operation)()
+    env = await c.compute.operate(
+        environment_id, ComputeOperation(operation), wait=wait, timeout_s=timeout_s
+    )
     return ok(env)
 
 

@@ -96,10 +96,46 @@ Then register it with adapter `openai_compatible`, `base_url: http://<host>:8000
 provider's `models:` list (the OpenAI protocol does not report them) and run
 *Model Registry → Verify*.
 
-Planned but **not implemented**: compute adapters that provision or start GPU VMs,
-Kubernetes workloads, or AWS, Azure or Google Cloud resources. The `ComputeProvider` port
-defines `provision`/`start`/`stop` as optional operations for them; see
-[developing adapters](../providers/developing-adapters.md).
+### Letting OMF manage the GPU infrastructure
+
+OMF can also run the inference server for you. The compute adapters `docker`,
+`kubernetes`, `aws_ec2`, `gcp_compute` and `azure_vm` create, start, stop and delete it
+(Azure: start and stop only). `configs/gpu-infrastructure.example.yaml` has one
+environment of each kind. The rules ([ADR-0012](../architecture/adr/0012-managed-compute-lifecycle.md)):
+
+- Nothing changes unless the environment sets `allow_lifecycle: true`. Even then, only
+  admins can trigger operations (*Infrastructure* screen, or
+  `POST /api/v1/compute/{id}/{provision|start|stop|deprovision}?wait=true`). Every call
+  is audited.
+- OMF labels what it creates and refuses to touch anything else with the same name.
+- Give the credentials the least privilege that works:
+  - Docker: access to the socket, which is root-equivalent on that host. Prefer a
+    dedicated GPU host.
+  - Kubernetes: one namespace, plus optional `list nodes`.
+  - AWS: `ec2:Describe*`, `RunInstances`, `CreateTags`, `Start/Stop/TerminateInstances`,
+    ideally conditioned on the `omf-managed` tag.
+  - Google Cloud: `compute.instances.*` in one project.
+  - Azure: *Virtual Machine Contributor* on one resource group.
+- Compute adapters manage *where* the server runs. Register the server itself as an
+  `openai_compatible` or `ollama` provider with `compute_environment_id` set to the
+  environment.
+
+Only the Docker adapter has been tested against the real service. Kubernetes, Compute
+Engine and Azure were tested against fakes of their REST APIs, and EC2 against moto.
+Try them in a sandbox account first.
+
+## Other container platforms (ECS, Cloud Run, Container Apps)
+
+OMF is one stateless container plus a database, so any container platform can host it.
+This has **not been tested**. The requirements are the same as for Kubernetes:
+
+- use PostgreSQL and S3 (or another shared store) when you run more than one task;
+- route a stream's cancel request to the same task (sticky sessions);
+- raise the load balancer's idle timeout above your longest stream (AWS ALB defaults to
+  60 s).
+
+There is no compute adapter for ECS/Fargate services. Their GPU support is limited to
+EC2-backed capacity, and you can describe it with `aws_ec2` or `local`.
 
 ## Google Colab
 

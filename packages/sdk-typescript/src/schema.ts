@@ -252,7 +252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Lifecycle operation (501 operation_not_supported unless the adapter supports it) */
+        /** Lifecycle operation (admin). 501 if the adapter cannot, 403 lifecycle_disabled unless the environment allows it */
         post: operations["compute_operation_api_v1_compute__environment_id___operation__post"];
         delete?: never;
         options?: never;
@@ -1047,7 +1047,7 @@ export interface components {
          * ComputeOperation
          * @enum {string}
          */
-        ComputeOperation: "describe_environment" | "get_resources" | "get_status" | "provision" | "start" | "stop";
+        ComputeOperation: "describe_environment" | "get_resources" | "get_status" | "provision" | "start" | "stop" | "deprovision";
         /** ComputeResources */
         ComputeResources: {
             /**
@@ -2601,11 +2601,14 @@ export interface operations {
     };
     compute_operation_api_v1_compute__environment_id___operation__post: {
         parameters: {
-            query?: never;
+            query?: {
+                wait?: boolean;
+                timeout_s?: number;
+            };
             header?: never;
             path: {
                 environment_id: string;
-                operation: "provision" | "start" | "stop";
+                operation: "provision" | "start" | "stop" | "deprovision";
             };
             cookie?: never;
         };

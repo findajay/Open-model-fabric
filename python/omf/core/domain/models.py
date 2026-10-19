@@ -293,6 +293,15 @@ class ComputeOperation(StrEnum):
     PROVISION = "provision"  # optional
     START = "start"  # optional
     STOP = "stop"  # optional
+    DEPROVISION = "deprovision"  # optional: delete what `provision` created
+
+
+LIFECYCLE_OPERATIONS = (
+    ComputeOperation.PROVISION,
+    ComputeOperation.START,
+    ComputeOperation.STOP,
+    ComputeOperation.DEPROVISION,
+)
 
 
 class EndpointInfo(DomainModel):

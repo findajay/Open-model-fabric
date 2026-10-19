@@ -10,15 +10,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from omf.adapters.compute import colab, local
+from omf.adapters._google import ServiceAccountTokenSource
+from omf.adapters.compute import aws_ec2, azure_vm, colab, docker, gcp_compute, kubernetes, local
 from omf.adapters.inference import mock, ollama, openai_compatible
 from omf.adapters.storage import google_drive, local_fs, s3
 from omf.core.domain.errors import ConfigurationError, ValidationFailed
 from omf.core.domain.models import Locality
 from omf.core.ports.compute import ComputeProvider
 from omf.core.ports.registry import AdapterCatalog, AdapterContext, InferenceAdapterDescriptor
+from omf.core.ports.secrets import SecretValue
 from omf.core.ports.storage import ArtifactStorageProvider
 
 INFERENCE_ADAPTERS = [
@@ -85,10 +87,15 @@ StorageFactory = Callable[[str, dict[str, Any], AdapterContext], ArtifactStorage
 def _parse(model: type[BaseModel], raw: dict[str, Any], what: str) -> Any:
     try:
         return model.model_validate(raw)
-    except Exception as exc:
+    except ValidationError as exc:
+        # Never echo input values: a misplaced secret must not reach errors or logs.
+        errors = [
+            {"loc": ".".join(map(str, e["loc"])), "msg": e["msg"]}
+            for e in exc.errors(include_input=False, include_url=False)
+        ]
         raise ValidationFailed(
-            f"invalid configuration for {what}", details={"error": str(exc)}
-        ) from exc
+            f"invalid configuration for {what}", details={"errors": errors}
+        ) from None
 
 
 def _local_compute(env_id: str, raw: dict[str, Any], _ctx: AdapterContext) -> ComputeProvider:
@@ -102,9 +109,89 @@ def _colab_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> Com
     return colab.ColabNotebookComputeAdapter(env_id, config, ctx.egress)
 
 
+def _secret(ctx: AdapterContext, ref: str | None) -> SecretValue | None:
+    return ctx.resolve_secret(ref) if ref else None
+
+
+def _docker_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> ComputeProvider:
+    config = _parse(docker.DockerComputeConfig, raw, "docker compute")
+    if not config.docker_host.startswith("unix://"):
+        ctx.egress.check_url_syntax(config.docker_host)
+    secrets = {name: ctx.resolve_secret(ref) for name, ref in config.env_secret_refs.items()}
+    return docker.DockerComputeAdapter(
+        env_id,
+        config,
+        ctx.egress,
+        secrets=secrets,
+        registry_auth=_secret(ctx, config.registry_auth_ref),
+    )
+
+
+def _kubernetes_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> ComputeProvider:
+    config = _parse(kubernetes.KubernetesComputeConfig, raw, "kubernetes compute")
+    if config.api_server:
+        ctx.egress.check_url_syntax(config.api_server)
+    return kubernetes.KubernetesComputeAdapter(
+        env_id,
+        config,
+        ctx.egress,
+        token=_secret(ctx, config.token_ref),
+        client_cert=_secret(ctx, config.client_cert_ref),
+        client_key=_secret(ctx, config.client_key_ref),
+        ca_cert=_secret(ctx, config.ca_cert_ref),
+    )
+
+
+def _aws_ec2_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> ComputeProvider:
+    config = _parse(aws_ec2.AwsEc2ComputeConfig, raw, "aws_ec2 compute")
+    if config.endpoint_url:
+        ctx.egress.check_url_syntax(config.endpoint_url)
+    return aws_ec2.AwsEc2ComputeAdapter(
+        env_id,
+        config,
+        ctx.egress,
+        access_key=_secret(ctx, config.access_key_id_ref),
+        secret_key=_secret(ctx, config.secret_access_key_ref),
+    )
+
+
+def _gcp_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> ComputeProvider:
+    config = _parse(gcp_compute.GcpComputeConfig, raw, "gcp_compute")
+    ctx.egress.check_url_syntax(config.api_base)
+    credentials = _secret(ctx, config.credentials_ref)
+    if credentials is None:
+        raise ValidationFailed("gcp_compute needs credentials_ref (service-account JSON)")
+    return gcp_compute.GcpComputeAdapter(
+        env_id, config, ctx.egress, ServiceAccountTokenSource(credentials, gcp_compute.SCOPE)
+    )
+
+
+def _azure_vm_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> ComputeProvider:
+    config = _parse(azure_vm.AzureVmComputeConfig, raw, "azure_vm compute")
+    ctx.egress.check_url_syntax(config.management_url)
+    ctx.egress.check_url_syntax(config.authority_url)
+    token = azure_vm.AzureClientCredentials(config, ctx.resolve_secret(config.client_secret_ref))
+    return azure_vm.AzureVmComputeAdapter(env_id, config, ctx.egress, token)
+
+
 COMPUTE_ADAPTERS: dict[str, ComputeFactory] = {
     local.ADAPTER_TYPE: _local_compute,
     colab.ADAPTER_TYPE: _colab_compute,
+    docker.ADAPTER_TYPE: _docker_compute,
+    kubernetes.ADAPTER_TYPE: _kubernetes_compute,
+    aws_ec2.ADAPTER_TYPE: _aws_ec2_compute,
+    gcp_compute.ADAPTER_TYPE: _gcp_compute,
+    azure_vm.ADAPTER_TYPE: _azure_vm_compute,
+}
+
+COMPUTE_CONFIG_MODELS: dict[str, type[BaseModel]] = {
+    local.ADAPTER_TYPE: local.LocalComputeConfig,
+    colab.ADAPTER_TYPE: colab.ColabNotebookConfig,
+    docker.ADAPTER_TYPE: docker.DockerComputeConfig,
+    kubernetes.ADAPTER_TYPE: kubernetes.KubernetesComputeConfig,
+    aws_ec2.ADAPTER_TYPE: aws_ec2.AwsEc2ComputeConfig,
+    gcp_compute.ADAPTER_TYPE: gcp_compute.GcpComputeConfig,
+    azure_vm.ADAPTER_TYPE: azure_vm.AzureVmComputeConfig,
 }
 
 
@@ -119,7 +206,7 @@ def _gdrive_storage(sid: str, raw: dict[str, Any], ctx: AdapterContext) -> Artif
     ctx.egress.check_url_syntax(config.api_base)
     credentials = ctx.resolve_secret(config.credentials_ref)
     return google_drive.GoogleDriveStorageAdapter(
-        sid, config, google_drive.ServiceAccountTokenSource(credentials, config.scope)
+        sid, config, ServiceAccountTokenSource(credentials, config.scope)
     )
 
 
@@ -167,10 +254,7 @@ def describe_component_adapters() -> list[dict[str, Any]]:
         (
             "compute",
             COMPUTE_ADAPTERS,
-            {
-                local.ADAPTER_TYPE: local.LocalComputeConfig,
-                colab.ADAPTER_TYPE: colab.ColabNotebookConfig,
-            },
+            COMPUTE_CONFIG_MODELS,
         ),
         (
             "storage",

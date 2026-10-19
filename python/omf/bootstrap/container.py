@@ -13,10 +13,19 @@ from typing import Any, BinaryIO
 from omf.adapters.metadata.sql import SqlMetadataStore
 from omf.adapters.secrets.env import EnvSecretProvider, FileSecretProvider
 from omf.adapters.telemetry.log_telemetry import CompositeTelemetry, LoggingTelemetry
-from omf.bootstrap.catalog import build_compute, build_storage, inference_catalog
+from omf.bootstrap.catalog import COMPUTE_ADAPTERS, build_compute, build_storage, inference_catalog
 from omf.bootstrap.config import AppConfig
-from omf.core.domain.errors import OMFError, StorageError
-from omf.core.domain.models import HealthStatus, StorageArtifact, StorageStatus
+from omf.core.domain.errors import ConfigurationError, OMFError, SecretNotFound, StorageError
+from omf.core.domain.models import (
+    ComputeEnvironment,
+    ComputeOperation,
+    ComputeResources,
+    ComputeState,
+    HealthStatus,
+    StorageArtifact,
+    StorageStatus,
+)
+from omf.core.ports.compute import ComputeProvider
 from omf.core.ports.registry import AdapterCatalog, AdapterContext
 from omf.core.ports.storage import ArtifactStorageProvider
 from omf.core.ports.telemetry import TelemetryProvider
@@ -81,6 +90,34 @@ class UnavailableStorage(ArtifactStorageProvider):
             status=HealthStatus.DOWN,
             message=self._error.message,
             details={"error_code": self._error.code},
+        )
+
+
+class UnavailableCompute(ComputeProvider):
+    """Stands in for a compute environment that failed to initialise."""
+
+    def __init__(self, environment_id: str, adapter_type: str, error: OMFError) -> None:
+        super().__init__(environment_id)
+        self._adapter_type = adapter_type
+        self._error = error
+
+    def supported_operations(self) -> list[ComputeOperation]:
+        return [ComputeOperation.DESCRIBE]
+
+    async def get_resources(self) -> ComputeResources | None:
+        return None
+
+    async def get_status(self) -> ComputeState:
+        return ComputeState.UNKNOWN
+
+    async def describe_environment(self) -> ComputeEnvironment:
+        return ComputeEnvironment(
+            id=self.environment_id,
+            kind=self._adapter_type,
+            display_name=self.environment_id,
+            state=ComputeState.UNKNOWN,
+            operations=self.supported_operations(),
+            notes=[f"Unavailable: {self._error.code}: {self._error.message}"],
         )
 
 
@@ -158,9 +195,16 @@ async def build_container(
     providers = ProviderRegistry(catalog, context, metadata, metadata)
     await providers.load(config.providers)
 
-    compute_providers = []
+    compute_providers: list[ComputeProvider] = []
     for c in config.compute:
-        compute_providers.append(build_compute(c.id, c.adapter, c.config, context))
+        if c.adapter not in COMPUTE_ADAPTERS:
+            build_compute(c.id, c.adapter, c.config, context)  # raises the configuration error
+        try:
+            compute_providers.append(build_compute(c.id, c.adapter, c.config, context))
+        except (SecretNotFound, ConfigurationError) as exc:
+            # Missing credentials or optional dependencies degrade one environment, not the API.
+            log.warning("compute environment %s unavailable: %s", c.id, exc.message)
+            compute_providers.append(UnavailableCompute(c.id, c.adapter, exc))
     compute = ComputeRegistry(compute_providers)
 
     storage_providers: list[ArtifactStorageProvider] = []

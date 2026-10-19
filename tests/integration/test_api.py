@@ -300,6 +300,40 @@ def test_platform_functional_when_colab_offline(
     assert client.get("/health/ready").status_code == 200
 
 
+def test_compute_lifecycle_operations_over_http(
+    make_config: Callable[..., AppConfig], make_client: Callable[..., TestClient]
+) -> None:
+    k8s = {"api_server": "http://127.0.0.1:9", "name": "vllm", "image": "vllm/vllm-openai:v0.32.0"}
+    config = make_config(
+        compute=[
+            {"id": "local", "adapter": "local", "config": {"detect_gpus": False}},
+            {"id": "k8s-locked", "adapter": "kubernetes", "config": k8s},
+            {"id": "k8s-open", "adapter": "kubernetes", "config": {**k8s, "allow_lifecycle": True}},
+            {
+                "id": "k8s-nosecret",
+                "adapter": "kubernetes",
+                "config": {**k8s, "token_ref": "env:OMF_TEST_MISSING_K8S_TOKEN"},
+            },
+        ]
+    )
+    client = make_client(config)
+    locked = client.post("/api/v1/compute/k8s-locked/start")
+    assert locked.status_code == 403
+    assert locked.json()["error"]["code"] == "lifecycle_disabled"
+    unreachable = client.post("/api/v1/compute/k8s-open/provision")
+    assert unreachable.status_code == 502
+    assert unreachable.json()["error"]["code"] == "compute_error"
+    assert client.post("/api/v1/compute/local/start").status_code == 501
+    assert client.post("/api/v1/compute/k8s-open/reboot").status_code == 422
+    assert client.post("/api/v1/compute/missing/start").status_code == 404
+    # A missing secret degrades that one environment instead of failing startup.
+    degraded = client.get("/api/v1/compute/k8s-nosecret").json()["data"]
+    assert degraded["state"] == "unknown" and "Unavailable" in degraded["notes"][0]
+    assert client.post("/api/v1/compute/k8s-nosecret/start").status_code == 501
+    actions = [a["action"] for a in client.get("/api/v1/audit").json()["data"]]
+    assert actions.count("compute.start") == 3 and "compute.provision" in actions
+
+
 def test_unauthorized_colab_endpoint_is_never_contacted(
     make_config: Callable[..., AppConfig],
     make_client: Callable[..., TestClient],
