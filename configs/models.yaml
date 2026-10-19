@@ -1,0 +1,100 @@
+# Model catalog: what a model *is*, independent of where it runs.
+# Capabilities listed here are DECLARED (unverified) until a deployment is probed
+# (POST /api/v1/deployments/verify) or the engine reports them itself.
+#
+# Licenses: open weights are not open source. Always read the model card; the
+# `commercial_use` field is a summary, not legal advice. See docs/providers/model-licensing.md.
+models:
+  - id: qwen2.5-0.5b-instruct
+    display_name: Qwen2.5 0.5B Instruct
+    family: qwen2.5
+    revision: null  # pin the Hugging Face commit you actually tested (recorded in benchmark runs)
+    parameters: 0.5B
+    description: Small instruction-tuned model; runs on CPU. Default model for the Colab lab.
+    context_window: 32768
+    max_output_tokens: 8192
+    quantizations: [bf16, q4_k_m, q8_0]
+    runtime_compatibility: [transformers, ollama, vllm, llama.cpp]
+    capabilities: [chat, text_generation, structured_output]
+    provider_aliases: ["qwen2.5:0.5b", "qwen2.5:0.5b-instruct", "Qwen/Qwen2.5-0.5B-Instruct"]
+    license:
+      name: Apache License 2.0
+      spdx_id: Apache-2.0
+      url: https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct/blob/main/LICENSE
+      commercial_use: allowed
+    artifacts:
+      - storage_provider_id: local
+        key: models/qwen2.5-0.5b-instruct/README.txt
+        format: pointer
+
+  - id: qwen2.5-1.5b-instruct
+    display_name: Qwen2.5 1.5B Instruct
+    family: qwen2.5
+    parameters: 1.5B
+    context_window: 32768
+    quantizations: [bf16, q4_k_m]
+    runtime_compatibility: [transformers, ollama, vllm, llama.cpp]
+    capabilities: [chat, text_generation, structured_output]
+    provider_aliases: ["qwen2.5:1.5b", "Qwen/Qwen2.5-1.5B-Instruct"]
+    license:
+      name: Apache License 2.0
+      spdx_id: Apache-2.0
+      commercial_use: allowed
+
+  - id: qwen2.5-7b-instruct
+    display_name: Qwen2.5 7B Instruct
+    family: qwen2.5
+    parameters: 7B
+    description: Optional larger configuration; needs a GPU with >= 16 GB VRAM in bf16.
+    context_window: 131072
+    quantizations: [bf16, awq, q4_k_m]
+    runtime_compatibility: [transformers, ollama, vllm, llama.cpp]
+    capabilities: [chat, text_generation, structured_output, tool_calling]
+    provider_aliases: ["qwen2.5:7b", "Qwen/Qwen2.5-7B-Instruct"]
+    license:
+      name: Apache License 2.0
+      spdx_id: Apache-2.0
+      commercial_use: allowed
+
+  - id: qwen2.5-vl-3b-instruct
+    display_name: Qwen2.5-VL 3B Instruct
+    family: qwen2.5-vl
+    parameters: 3B
+    input_modalities: [text, image]
+    context_window: 32768
+    runtime_compatibility: [transformers, vllm, ollama]
+    capabilities: [chat, text_generation, vision_input]
+    provider_aliases: ["qwen2.5vl:3b", "Qwen/Qwen2.5-VL-3B-Instruct"]
+    license:
+      name: Qwen Research License
+      url: https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/blob/main/LICENSE
+      commercial_use: restricted
+      notes: Research license for the 3B variant; check the model card before commercial use.
+
+  - id: llama-3.2-1b-instruct
+    display_name: Llama 3.2 1B Instruct
+    family: llama3.2
+    parameters: 1B
+    context_window: 131072
+    runtime_compatibility: [transformers, ollama, vllm, llama.cpp]
+    capabilities: [chat, text_generation, tool_calling]
+    provider_aliases: ["llama3.2:1b", "meta-llama/Llama-3.2-1B-Instruct"]
+    license:
+      name: Llama 3.2 Community License
+      url: https://www.llama.com/llama3_2/license/
+      commercial_use: restricted
+      notes: Custom license with acceptable-use policy and a 700M MAU threshold. Not OSI open source.
+
+  - id: nomic-embed-text
+    display_name: Nomic Embed Text v1.5
+    family: nomic-bert
+    input_modalities: [text]
+    output_modalities: [embedding]
+    context_window: 8192
+    runtime_compatibility: [ollama, sentence-transformers]
+    capabilities: [embeddings]
+    provider_aliases: ["nomic-embed-text", "nomic-embed-text:latest"]
+    license:
+      name: Apache License 2.0
+      spdx_id: Apache-2.0
+      commercial_use: allowed

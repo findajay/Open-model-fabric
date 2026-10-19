@@ -1,0 +1,65 @@
+# Local AI profile: real models through Ollama on this machine (CPU or GPU).
+#   Ollama + local compute + local filesystem + SQLite
+# Prerequisite: `ollama serve` and e.g. `ollama pull qwen2.5:0.5b`.
+# The mock provider stays enabled so the UI works even when Ollama is stopped.
+profile: local-ollama
+environment: development
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  cors_allow_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+auth:
+  mode: none   # localhost only; enforced by the config validator
+
+security:
+  egress:
+    allow_loopback: true
+    allow_private_networks: true
+
+metadata:
+  url: "sqlite:///${OMF_DATA_DIR:-./var}/omf.db"
+
+compute:
+  - id: local
+    adapter: local
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: "${OMF_DATA_DIR:-./var}/artifacts"
+
+providers:
+  - id: ollama
+    adapter_type: ollama
+    display_name: Local Ollama
+    compute_environment_id: local
+    timeouts:
+      connect_s: 3
+      read_s: 300        # first token can wait for the model to load
+      total_s: 600
+    config:
+      base_url: "${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
+      keep_alive: 10m
+
+  - id: mock
+    adapter_type: mock
+    display_name: Mock provider
+
+inference:
+  default_provider: ollama
+  default_model: qwen2.5-0.5b-instruct   # catalog id; resolves to qwen2.5:0.5b in Ollama
+  routing:
+    mode: default
+    # Falling back from a real model to the mock would silently change answers, so it
+    # is NOT enabled here. Enable explicitly if you want it:
+    # allow_cross_provider_fallback: true
+    # fallback_provider_ids: [mock]
+
+health:
+  interval_s: 15
+
+model_catalogs: ["models.yaml"]
