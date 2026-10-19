@@ -113,11 +113,19 @@ streaming with normalised events. Per-request provider selection. Capability evi
 * README, CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, LICENSE (Apache-2.0) and NOTICE.
 * Docs: deployment, troubleshooting, model compatibility and licensing.
 
-**Not verified here.**
-* The workflows were written for GitHub Actions. They run when pushed, and their
-  results are visible on the repository.
-* GitHub Actions are pinned to major-version tags, not commit SHAs. Dependabot keeps
-  them current; pin SHAs for stricter supply-chain control.
+**CI status.** All workflows were run on GitHub Actions and pass:
+* CI: Python 3.11 and 3.13 with PostgreSQL 17, web, contract drift, e2e, and the Docker
+  image build;
+* Security;
+* the notebook smoke run, which executes the notebook with CPU torch.
+
+The first CI run found two real IPv6 problems that the IPv4-only sandbox had hidden:
+* the egress policy rejected `::1` even when `allow_loopback` was set, because Python
+  also classifies `::1` as "reserved";
+* the e2e preview server bound to `localhost` (`::1`) while the test polled `127.0.0.1`.
+
+Both are fixed. GitHub Actions are pinned to major-version tags, not commit SHAs;
+Dependabot keeps them current, and you can pin SHAs for stricter supply-chain control.
 
 ## Remaining work (not implemented)
 
