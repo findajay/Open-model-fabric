@@ -26,9 +26,11 @@ to text-only models, and the UI would show controls that fail.
 ## Consequences
 - Discovered OpenAI-compatible models only support plain chat until the operator
   declares more or a probe verifies it. That is conservative by design.
-- Verification probes chat, text_generation, streaming and (when claimed)
-  structured_output. Vision, tools and embeddings are not probed automatically and stay
-  at their existing evidence level.
+- Verification probes chat, text_generation, streaming and, when claimed,
+  structured_output and embeddings. Vision and tools are not probed automatically and
+  stay at their existing evidence level.
+- An explicit declaration (provider `models:` or catalog) replaces an adapter's default
+  guesses, but never claims an engine reported (amended with the embeddings endpoint).
 - A new probe replaces all earlier `verified` claims for that deployment. A capability
   that fails re-verification falls back to its declared or reported evidence.
 

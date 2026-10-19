@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import math
 import time
 from typing import Any, NoReturn
 
@@ -24,7 +25,7 @@ from omf.core.domain.errors import (
     ProviderTimeout,
     ProviderUnavailable,
 )
-from omf.core.domain.models import Timeouts
+from omf.core.domain.models import EmbeddingRequest, Timeouts
 from omf.core.security.egress import EgressPolicy
 
 _EGRESS_CACHE_S = 60.0
@@ -164,3 +165,22 @@ async def read_error_body(response: httpx.Response) -> str:
     except httpx.HTTPError:
         return ""
     return _body_text(response)
+
+
+def check_vectors(provider_id: str, vectors: Any, request: EmbeddingRequest) -> list[list[float]]:
+    """Validate an engine's embeddings: one non-empty numeric vector per input, same size."""
+    if not isinstance(vectors, list) or len(vectors) != len(request.inputs):
+        raise ProviderError(
+            f"provider {provider_id!r} returned "
+            f"{len(vectors) if isinstance(vectors, list) else 'no'} embeddings "
+            f"for {len(request.inputs)} inputs"
+        )
+    try:
+        out = [[float(x) for x in v] for v in vectors]
+    except (TypeError, ValueError) as exc:
+        raise ProviderError(f"provider {provider_id!r} returned non-numeric embeddings") from exc
+    if not all(math.isfinite(x) for v in out for x in v):
+        raise ProviderError(f"provider {provider_id!r} returned non-finite embeddings")
+    if not out[0] or any(len(v) != len(out[0]) for v in out):
+        raise ProviderError(f"provider {provider_id!r} returned embeddings of unequal size")
+    return out

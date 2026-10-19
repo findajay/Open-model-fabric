@@ -14,6 +14,8 @@ export type ModelCreate = S["ModelCreate"];
 export type ChatRequest = S["ChatRequest"];
 export type ChatMessage = S["ChatMessage"];
 export type InferenceResponse = S["InferenceResponse"];
+export type EmbeddingsRequest = S["EmbeddingsRequest"];
+export type EmbeddingResponse = S["EmbeddingResponse"];
 export type Conversation = S["Conversation"];
 export type ComputeEnvironment = S["ComputeEnvironment"];
 export type ComputeLifecycleOperation = "provision" | "start" | "stop" | "deprovision";
@@ -140,8 +142,11 @@ export class OmfClient {
       "/api/v1/settings",
       changes,
     );
-  metrics = (window = 500) =>
-    this.request<MetricsSummary>("GET", `/api/v1/metrics/summary?window=${window}`);
+  metrics = (window = 500, operation: "chat" | "embeddings" = "chat") =>
+    this.request<MetricsSummary>(
+      "GET",
+      `/api/v1/metrics/summary?window=${window}&operation=${operation}`,
+    );
   recentRequests = (limit = 50) =>
     this.request<InferenceRecord[]>("GET", `/api/v1/requests/recent?limit=${limit}`);
   audit = (limit = 100) => this.request<AuditEntry[]>("GET", `/api/v1/audit?limit=${limit}`);
@@ -224,6 +229,10 @@ export class OmfClient {
     );
 
   // ------------------------------------------------------------------ conversations
+
+  /** Embed one or more texts (routed to a model with the `embeddings` capability). */
+  embeddings = (body: EmbeddingsRequest) =>
+    this.request<EmbeddingResponse>("POST", "/api/v1/embeddings", body);
 
   conversations = () => this.request<Conversation[]>("GET", "/api/v1/conversations");
   conversation = (id: string) =>

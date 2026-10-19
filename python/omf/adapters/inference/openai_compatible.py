@@ -8,8 +8,12 @@ configuration (``stream_usage``, ``list_models``), not by separate adapters.
 
 Model capabilities: ``/v1/models`` carries no capability metadata. Listed models are
 therefore marked ``chat`` *declared* by the adapter (the operator configured a chat
-endpoint); everything else (vision, tools, JSON mode) must be declared in the provider's
-``models`` section or verified with the probe.
+endpoint); everything else (vision, tools, JSON mode, embeddings) must be declared in the
+provider's ``models`` section or verified with the probe. A declaration replaces the
+adapter's guess, so a model declared as ``[embeddings]`` is not also a chat model.
+
+Embeddings use ``POST /embeddings`` (vLLM ``--task embed``, llama.cpp ``--embeddings``,
+TEI, OpenAI). Vectors are requested as floats; base64 encoding is not used.
 """
 
 from __future__ import annotations
@@ -22,13 +26,15 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from omf.adapters.inference._http import HttpEndpoint, read_error_body
+from omf.adapters.inference._http import HttpEndpoint, check_vectors, read_error_body
 from omf.core.domain.capabilities import Capability, CapabilitySet, Modality
 from omf.core.domain.errors import OMFError, ProviderAuthenticationFailed, ProviderError
 from omf.core.domain.models import (
     AuthRequirement,
     ChatMessage,
     DiscoveredModel,
+    EmbeddingRequest,
+    EmbeddingResult,
     GenerationChunk,
     GenerationResult,
     HealthStatus,
@@ -252,6 +258,35 @@ class OpenAICompatibleInferenceAdapter(InferenceProvider):
             self._http.raise_for(exc)
         yield GenerationChunk(finish_reason=finish or "stop", usage=usage)
 
+    async def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
+        body: dict[str, Any] = {
+            "model": request.model,
+            "input": request.inputs,
+            "encoding_format": "float",
+        }
+        if request.dimensions is not None:
+            body["dimensions"] = request.dimensions
+        await self._http.ensure_egress()
+        try:
+            response = await self._http.client.post("/embeddings", json=body)
+            response.raise_for_status()
+            payload = response.json()
+        except httpx.HTTPError as exc:
+            self._http.raise_for(exc)
+        except ValueError as exc:
+            raise ProviderError(f"provider {self.provider_id!r} returned invalid JSON") from exc
+        try:
+            items = sorted(payload["data"], key=lambda d: int(d.get("index", 0)))
+            vectors = [item["embedding"] for item in items]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ProviderError(
+                f"provider {self.provider_id!r} returned an unexpected embeddings payload"
+            ) from exc
+        return EmbeddingResult(
+            vectors=check_vectors(self.provider_id, vectors, request),
+            usage=_usage(payload.get("usage")),
+        )
+
     async def health_check(self) -> ProviderHealth:
         started = time.perf_counter()
         try:
@@ -296,6 +331,7 @@ CAPABILITIES = ProviderCapabilities(
         ProviderOperation.GENERATE,
         ProviderOperation.STREAM_GENERATE,
         ProviderOperation.HEALTH_CHECK,
+        ProviderOperation.EMBED,
     ],
     modalities=[Modality.TEXT, Modality.IMAGE],
     streaming=True,

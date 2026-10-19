@@ -24,6 +24,7 @@ from omf_api.routers import (
     benchmarks,
     chat,
     conversations,
+    embeddings,
     infrastructure,
     models,
     providers,
@@ -104,7 +105,16 @@ def create_app(
         max_upload_bytes=cfg.server.max_upload_bytes,
     )
     app.include_router(system.health_router)
-    for module in (system, providers, models, chat, conversations, infrastructure, benchmarks):
+    for module in (
+        system,
+        providers,
+        models,
+        chat,
+        embeddings,
+        conversations,
+        infrastructure,
+        benchmarks,
+    ):
         app.include_router(module.router)
 
     _document_stream_events(app)

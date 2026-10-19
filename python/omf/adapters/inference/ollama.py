@@ -22,7 +22,7 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
-from omf.adapters.inference._http import HttpEndpoint, read_error_body
+from omf.adapters.inference._http import HttpEndpoint, check_vectors, read_error_body
 from omf.core.domain.capabilities import (
     Capability,
     CapabilityClaim,
@@ -35,6 +35,8 @@ from omf.core.domain.models import (
     AuthRequirement,
     ChatMessage,
     DiscoveredModel,
+    EmbeddingRequest,
+    EmbeddingResult,
     GenerationChunk,
     GenerationResult,
     HealthStatus,
@@ -277,6 +279,20 @@ class OllamaInferenceAdapter(InferenceProvider):
             )
         yield GenerationChunk(finish_reason=final.get("done_reason") or "stop", usage=_usage(final))
 
+    async def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
+        body: dict[str, Any] = {"model": request.model, "input": request.inputs}
+        if request.dimensions is not None:
+            body["dimensions"] = request.dimensions
+        if self._config.keep_alive:
+            body["keep_alive"] = self._config.keep_alive
+        payload = await self._get_json("POST", "/api/embed", body)
+        if "error" in payload:
+            raise ProviderError(f"provider {self.provider_id!r}: {str(payload['error'])[:300]}")
+        return EmbeddingResult(
+            vectors=check_vectors(self.provider_id, payload.get("embeddings"), request),
+            usage=_usage(payload),
+        )
+
     async def health_check(self) -> ProviderHealth:
         started = time.perf_counter()
         try:
@@ -307,6 +323,7 @@ CAPABILITIES = ProviderCapabilities(
         ProviderOperation.GENERATE,
         ProviderOperation.STREAM_GENERATE,
         ProviderOperation.HEALTH_CHECK,
+        ProviderOperation.EMBED,
     ],
     modalities=[Modality.TEXT, Modality.IMAGE],
     streaming=True,

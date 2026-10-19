@@ -3,8 +3,8 @@
 Mandatory operations: ``get_capabilities``, ``list_models``, ``generate``,
 ``stream_generate``, ``health_check``.
 
-Optional operations: ``cancel``. An adapter that does not support server-side
-cancellation inherits the default implementation, which raises
+Optional operations: ``cancel`` and ``embed``. An adapter that does not support them
+inherits the default implementations, which raise
 :class:`~omf.core.domain.errors.OperationNotSupported`. Client-side cancellation
 (closing the stream) is always available: the application service cancels the task that
 consumes ``stream_generate``, and adapters must release their connections when the
@@ -19,6 +19,8 @@ from collections.abc import AsyncGenerator
 from omf.core.domain.errors import OperationNotSupported
 from omf.core.domain.models import (
     DiscoveredModel,
+    EmbeddingRequest,
+    EmbeddingResult,
     GenerationChunk,
     GenerationResult,
     InferenceRequest,
@@ -64,6 +66,13 @@ class InferenceProvider(ABC):
         raise OperationNotSupported(
             f"provider {self.provider_id!r} does not support server-side cancellation",
             details={"operation": "cancel", "provider_id": self.provider_id},
+        )
+
+    async def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
+        """Optional: embed ``request.inputs``; one vector per input, in order."""
+        raise OperationNotSupported(
+            f"provider {self.provider_id!r} does not support embeddings",
+            details={"operation": "embed", "provider_id": self.provider_id},
         )
 
     async def aclose(self) -> None:
