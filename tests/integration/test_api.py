@@ -873,3 +873,20 @@ def test_prompt_content_is_logged_only_when_opted_in(
     )
     chat(opted_in, messages=[{"role": "user", "content": "please-log-me"}])
     assert "please-log-me" in caplog.text
+
+
+def test_built_web_app_is_served_with_spa_fallback(
+    tmp_path: Path, make_config: Callable[..., AppConfig], make_client: Callable[..., TestClient]
+) -> None:
+    web = tmp_path / "web"
+    (web / "assets").mkdir(parents=True)
+    (web / "index.html").write_text("<html>omf-ui</html>")
+    (web / "assets" / "app.js").write_text("console.log('ok')")
+    (tmp_path / "secret.txt").write_text("outside web root")
+    client = make_client(make_config(server={"serve_web_dir": str(web)}))
+    assert client.get("/").text == "<html>omf-ui</html>"
+    assert client.get("/playground").text == "<html>omf-ui</html>"  # client-side route
+    assert client.get("/assets/app.js").text == "console.log('ok')"
+    assert "outside web root" not in client.get("/../secret.txt").text
+    assert client.get("/api/v1/providers").json()["data"][0]["id"] == "mock"  # API wins
+    assert client.get("/api/v1/does-not-exist").status_code == 404  # no SPA fallback for API

@@ -1,0 +1,57 @@
+# Local stack. From the repository root:
+#   cp .env.example .env   # set OMF_ADMIN_TOKEN
+#   docker compose -f infrastructure/compose/docker-compose.yml up --build
+#   docker compose -f infrastructure/compose/docker-compose.yml --profile ollama up --build
+name: open-model-fabric
+
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile
+    image: open-model-fabric:local
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      OMF_ADMIN_TOKEN: ${OMF_ADMIN_TOKEN:?set OMF_ADMIN_TOKEN in .env (at least 16 characters)}
+      OMF_ENABLE_OLLAMA: ${OMF_ENABLE_OLLAMA:-false}
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - omf-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # Optional real inference: `--profile ollama`, then pull a model:
+  #   docker compose -f infrastructure/compose/docker-compose.yml exec ollama ollama pull qwen2.5:0.5b
+  ollama:
+    image: ollama/ollama:0.40.6
+    profiles: ["ollama"]
+    volumes:
+      - ollama-models:/root/.ollama
+    # GPU (NVIDIA Container Toolkit) — uncomment:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+    restart: unless-stopped
+
+  # Optional PostgreSQL for production-like metadata (`--profile postgres`). Point a
+  # profile's metadata.url_ref at OMF_DATABASE_URL to use it.
+  postgres:
+    image: postgres:17.11
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_DB: omf
+      POSTGRES_USER: omf
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+
+volumes:
+  omf-data:
+  ollama-models:
+  pg-data:

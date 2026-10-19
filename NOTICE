@@ -1,0 +1,7 @@
+Open Model Fabric
+Copyright 2026 The Open Model Fabric contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Model weights are not part of this distribution. Models referenced in configs/models.yaml
+are licensed separately by their authors; see docs/providers/model-licensing.md.

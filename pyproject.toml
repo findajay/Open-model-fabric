@@ -71,7 +71,11 @@ markers = [
   "postgres: requires a PostgreSQL server (OMF_TEST_POSTGRES_URL)",
   "notebook: executes the Colab notebook in smoke mode (needs torch + transformers)",
 ]
-filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
+filterwarnings = [
+  "error::pytest.PytestUnraisableExceptionWarning",
+  # starlette.testclient still uses httpx; harmless for tests
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
 
 [tool.ruff]
 line-length = 100
