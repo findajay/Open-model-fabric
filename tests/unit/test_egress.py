@@ -45,6 +45,7 @@ def test_strict_policy_blocks_loopback_and_private(url: str) -> None:
 
 def test_dev_policy_allows_loopback_and_private() -> None:
     DEV.check_url_syntax("http://127.0.0.1:11434")
+    DEV.check_url_syntax("http://[::1]:11434")  # IPv6 loopback (also in Python's "reserved" ::/8)
     DEV.check_url_syntax("http://10.0.0.5:8000/v1")
 
 
