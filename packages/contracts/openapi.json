@@ -1385,6 +1385,161 @@
         "title": "DeploymentState",
         "type": "string"
       },
+      "Embedding": {
+        "properties": {
+          "embedding": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Embedding",
+            "type": "array"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "embedding"
+        ],
+        "title": "Embedding",
+        "type": "object"
+      },
+      "EmbeddingResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Embedding"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "dimensions": {
+            "title": "Dimensions",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "route": {
+            "$ref": "#/components/schemas/RouteDecision"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/Timings"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "provider_id",
+          "model",
+          "model_id",
+          "data",
+          "dimensions",
+          "usage",
+          "timings",
+          "route"
+        ],
+        "title": "EmbeddingResponse",
+        "type": "object"
+      },
+      "EmbeddingsRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "dimensions": {
+            "anyOf": [
+              {
+                "maximum": 8192.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Requested vector size (model-dependent)",
+            "title": "Dimensions"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ],
+            "description": "Text or list of texts (up to 256) to embed; one vector per text",
+            "title": "Input"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider-native model name or catalog model id; default: the first model that declares the embeddings capability",
+            "title": "Model"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explicit provider; disables fallback",
+            "title": "Provider Id"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/Sensitivity",
+            "default": "normal"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "title": "EmbeddingsRequest",
+        "type": "object"
+      },
       "EndpointInfo": {
         "properties": {
           "authorized": {
@@ -1502,6 +1657,22 @@
           "meta"
         ],
         "title": "Envelope[Conversation]",
+        "type": "object"
+      },
+      "Envelope_EmbeddingResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/EmbeddingResponse"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[EmbeddingResponse]",
         "type": "object"
       },
       "Envelope_InferenceResponse_": {
@@ -2405,6 +2576,15 @@
             ],
             "title": "Model"
           },
+          "operation": {
+            "default": "chat",
+            "enum": [
+              "chat",
+              "embeddings"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
           "prompt_tokens": {
             "anyOf": [
               {
@@ -2474,6 +2654,7 @@
         },
         "required": [
           "request_id",
+          "operation",
           "provider_id",
           "model",
           "status",
@@ -3506,7 +3687,8 @@
           "generate",
           "stream_generate",
           "health_check",
-          "cancel"
+          "cancel",
+          "embed"
         ],
         "title": "ProviderOperation",
         "type": "string"
@@ -5529,6 +5711,47 @@
         ]
       }
     },
+    "/api/v1/embeddings": {
+      "post": {
+        "operationId": "create_embeddings_api_v1_embeddings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmbeddingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_EmbeddingResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Embed texts with a model that declares the embeddings capability",
+        "tags": [
+          "embeddings"
+        ]
+      }
+    },
     "/api/v1/health/providers": {
       "get": {
         "operationId": "provider_health_api_v1_health_providers_get",
@@ -5574,6 +5797,7 @@
     },
     "/api/v1/metrics/summary": {
       "get": {
+        "description": "Statistics over the last ``window`` records of one operation (chat by default, so\nembedding latencies do not distort chat latency percentiles).",
         "operationId": "metrics_summary_api_v1_metrics_summary_get",
         "parameters": [
           {
@@ -5584,6 +5808,20 @@
               "default": 500,
               "title": "Window",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "operation",
+            "required": false,
+            "schema": {
+              "default": "chat",
+              "enum": [
+                "chat",
+                "embeddings"
+              ],
+              "title": "Operation",
+              "type": "string"
             }
           }
         ],

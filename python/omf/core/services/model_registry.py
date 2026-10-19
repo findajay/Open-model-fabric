@@ -30,6 +30,7 @@ from omf.core.domain.models import (
     ChatMessage,
     DeploymentState,
     DiscoveredModel,
+    EmbeddingRequest,
     GenerationParams,
     InferenceRequest,
     ModelDefinition,
@@ -219,7 +220,13 @@ class ModelRegistryService:
             extra = CapabilitySet(
                 claims=tuple(c for c in extra.claims if caps.supports(c.capability))
             )
-        caps = caps.merge(extra)
+        if extra.claims and all(c.evidence == Evidence.DECLARED for c in caps.claims):
+            # Only adapter guesses so far (e.g. "a listed OpenAI model is a chat model"):
+            # an explicit operator or catalog declaration replaces them, so an embedding
+            # model declared as [embeddings] does not also claim chat.
+            caps = extra
+        else:
+            caps = caps.merge(extra)
         if adapter_default_streaming and caps.supports(Capability.CHAT):
             # Streaming is a protocol feature of the adapter; still only "declared".
             caps = caps.merge(CapabilitySet.declared([Capability.STREAMING], "adapter"))
@@ -299,6 +306,9 @@ class ModelRegistryService:
 
         prompt = [ChatMessage(role=Role.USER, content="Reply with the single word: OK")]
         params = GenerationParams(max_tokens=16, temperature=0)
+        caps = deployment.capabilities
+        # Embedding-only models are not sent a chat probe (it would always fail).
+        probe_chat = caps.supports(Capability.CHAT) or not caps.supports(Capability.EMBEDDINGS)
         async with self._providers.lease(provider_id) as adapter:
             req = InferenceRequest(
                 request_id=new_id("probe"),
@@ -306,15 +316,31 @@ class ModelRegistryService:
                 messages=prompt,
                 params=params,
             )
-            try:
-                result = await adapter.generate(req)
-                if result.content.strip():
-                    ok(Capability.CHAT, "non-streaming chat completion returned text")
-                    ok(Capability.TEXT_GENERATION, "model produced text output")
-                else:
-                    fail(Capability.CHAT, "empty completion")
-            except OMFError as exc:
-                fail(Capability.CHAT, f"{exc.code}: {exc.message}")
+            if caps.supports(Capability.EMBEDDINGS):
+                try:
+                    embedded = await adapter.embed(
+                        EmbeddingRequest(
+                            request_id=new_id("probe"),
+                            model=deployment.provider_model,
+                            inputs=["probe one", "probe two"],
+                        )
+                    )
+                    ok(
+                        Capability.EMBEDDINGS,
+                        f"returned 2 vectors of {len(embedded.vectors[0])} dimensions",
+                    )
+                except OMFError as exc:
+                    fail(Capability.EMBEDDINGS, f"{exc.code}: {exc.message}")
+            if probe_chat:
+                try:
+                    result = await adapter.generate(req)
+                    if result.content.strip():
+                        ok(Capability.CHAT, "non-streaming chat completion returned text")
+                        ok(Capability.TEXT_GENERATION, "model produced text output")
+                    else:
+                        fail(Capability.CHAT, "empty completion")
+                except OMFError as exc:
+                    fail(Capability.CHAT, f"{exc.code}: {exc.message}")
 
             if deployment.capabilities.supports(Capability.STREAMING):
                 chunks = 0

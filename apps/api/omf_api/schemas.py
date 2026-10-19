@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Generic, Literal, TypeVar
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, field_validator
 
 from omf.core.domain.base import DomainModel
 from omf.core.domain.capabilities import Capability
@@ -90,6 +90,39 @@ class ChatRequest(DomainModel):
 
     def domain_messages(self) -> list[ChatMessage]:
         return [ChatMessage(role=m.role, content=m.content) for m in self.messages]
+
+
+class EmbeddingsRequest(DomainModel):
+    model_config = ConfigDict(extra="forbid")
+
+    input: str | list[str] = Field(
+        description="Text or list of texts (up to 256) to embed; one vector per text"
+    )
+    provider_id: str | None = Field(
+        default=None, description="Explicit provider; disables fallback"
+    )
+    model: str | None = Field(
+        default=None,
+        description="Provider-native model name or catalog model id; default: the first "
+        "model that declares the embeddings capability",
+    )
+    dimensions: int | None = Field(
+        default=None, ge=1, le=8192, description="Requested vector size (model-dependent)"
+    )
+    sensitivity: Sensitivity = Sensitivity.NORMAL
+
+    @field_validator("input")
+    @classmethod
+    def _inputs(cls, v: str | list[str]) -> str | list[str]:
+        items = [v] if isinstance(v, str) else v
+        if not 1 <= len(items) <= 256:
+            raise ValueError("input must contain between 1 and 256 texts")
+        if any(not text.strip() for text in items):
+            raise ValueError("input texts must not be empty")
+        return v
+
+    def inputs(self) -> list[str]:
+        return [self.input] if isinstance(self.input, str) else list(self.input)
 
 
 class CancelResult(DomainModel):

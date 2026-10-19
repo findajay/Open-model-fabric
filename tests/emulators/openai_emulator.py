@@ -1,7 +1,8 @@
 """OpenAI-compatible *protocol* emulator (the shape served by vLLM, llama.cpp, TGI, ...).
 
-Implements ``GET /v1/models`` and ``POST /v1/chat/completions`` (JSON and SSE with
-``stream_options.include_usage``), optionally requiring a bearer token. Replies are
+Implements ``GET /v1/models``, ``POST /v1/chat/completions`` (JSON and SSE with
+``stream_options.include_usage``) and ``POST /v1/embeddings``, optionally requiring a
+bearer token. Replies are
 deterministic text — no model runs. Used by tests and by the offline provider-switching
 demo; point the same configuration at a real vLLM/llama.cpp server for real inference.
 
@@ -24,11 +25,13 @@ from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
 from tests.emulators._disconnect import until_disconnect
+from tests.emulators.ollama_emulator import fake_vector
 
 MODELS = {
     "Qwen/Qwen2.5-0.5B-Instruct": {"max_model_len": 32768},
     "remote-small": {"max_model_len": 4096},
 }
+EMBEDDING_MODELS = {"BAAI/bge-small-en-v1.5": {"max_model_len": 512, "dimensions": 384}}
 
 
 @dataclass
@@ -84,7 +87,7 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
                         "owned_by": "emulator",
                         **meta,
                     }
-                    for name, meta in MODELS.items()
+                    for name, meta in {**MODELS, **EMBEDDING_MODELS}.items()
                 ],
             }
         )
@@ -190,10 +193,40 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
             until_disconnect(request, gen(), aborted), media_type="text/event-stream"
         )
 
+    async def embeddings(request: Request) -> Response:
+        if (denied := check_auth(request)) is not None:
+            return denied
+        body = await request.json()
+        st.requests.append(body)
+        if st.fail_with_status:
+            return _error(st.fail_with_status, "emulated failure", "server_error")
+        model = body.get("model")
+        if model not in EMBEDDING_MODELS:
+            # vLLM answers like this when the model was not started with --task embed.
+            return _error(400, f"The model {model} does not support Embeddings API")
+        inputs = body.get("input")
+        texts = [inputs] if isinstance(inputs, str) else list(inputs or [])
+        dims = int(body.get("dimensions") or EMBEDDING_MODELS[model]["dimensions"])
+        tokens = sum(len(t.split()) for t in texts)
+        data = [
+            {"object": "embedding", "index": i, "embedding": fake_vector(t, dims)}
+            for i, t in enumerate(texts)
+        ]
+        return JSONResponse(
+            {
+                "object": "list",
+                "model": model,
+                # Deliberately out of order: clients must sort by "index".
+                "data": list(reversed(data)),
+                "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
+            }
+        )
+
     app = Starlette(
         routes=[
             Route("/v1/models", models),
             Route("/v1/chat/completions", completions, methods=["POST"]),
+            Route("/v1/embeddings", embeddings, methods=["POST"]),
         ]
     )
     app.state.emulator = st

@@ -164,11 +164,41 @@ Dependabot keeps them current, and you can pin SHAs for stricter supply-chain co
   default). A secret misplaced in the wrong field could therefore reach error details.
   The errors now omit input values.
 
+## Phase 7 — Embeddings
+
+**Implemented.**
+* `POST /api/v1/embeddings` and the SDK method `embeddings`.
+* `embed` as an optional port operation, with adapters for mock (`mock-embed`), Ollama
+  (`/api/embed`) and OpenAI-compatible servers (`/embeddings`, which sorts by `index`).
+* Engine output is validated: one finite vector per input, all the same size.
+* Routing on the `embeddings` capability; the default chat model is never used.
+* Inference records are tagged with `operation`. The metrics summary filters by
+  operation, so embedding latencies do not distort chat percentiles.
+* A verification probe for `embeddings`.
+
+**Found while building it.**
+* On OpenAI-compatible servers, an embedding model declared `[embeddings]` also kept the
+  adapter's "listed model ⇒ chat" guess. It could therefore be routed chat traffic.
+  Declarations now replace adapter guesses.
+* The Docker compute adapter pulled the image on every provision, and Docker Hub rate
+  limits made the integration test fail. It now pulls only when the image is missing
+  (`pull_policy: if_not_present`, the default; `always` is available).
+
+**Tests.** `tests/integration/test_embeddings.py` covers:
+* each adapter, against the Ollama/OpenAI protocol emulators, which return pseudo-vectors
+  in the real wire formats;
+* vector validation;
+* capability routing, the declaration override, the verify probe, and record/metrics
+  tagging.
+
+Both fixes were mutation-checked: reverting either one makes these tests fail. No real
+embedding model was run.
+
 ## Remaining work (not implemented)
 
-* Tool-calling request/response passthrough, an embeddings endpoint, and audio input and
-  output. These capabilities exist in the vocabulary, the catalog and the UI badges
-  only.
+* Tool-calling request/response passthrough, and audio input and output. These
+  capabilities exist in the vocabulary, the catalog and the UI badges only.
+* A UI for embeddings: the endpoint and SDK exist, but no screen calls them.
 * Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
   provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters
   against real clusters and accounts.

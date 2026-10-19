@@ -64,12 +64,13 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
 | `POST /api/v1/chat/completions` | user | `ChatRequest` → `InferenceResponse` |
 | `POST /api/v1/chat/stream` | user | `ChatRequest` → `text/event-stream` |
 | `POST /api/v1/chat/requests/{request_id}/cancel` | user | `{request_id, cancelled}` |
+| `POST /api/v1/embeddings` | user | `EmbeddingsRequest` → `EmbeddingResponse` (see below) |
 | `GET /api/v1/chat/requests` | user | Ids of in-flight requests |
 | `GET/POST /api/v1/conversations` | user | List the caller's conversations (`limit` ≤ 200; admins: `all_users=true`) / create |
 | `GET/PATCH/DELETE /api/v1/conversations/{id}` | user (owner) or admin | Get with messages / rename / delete; 404 for other users' conversations |
 | `GET /api/v1/compute?refresh=` | user | Compute environments (cached until `refresh=true`) |
 | `GET /api/v1/compute/{id}?refresh=` | user | Refreshes by default |
-| `POST /api/v1/compute/{id}/{provision\|start\|stop}` | admin | 501 `operation_not_supported` for the built-in adapters |
+| `POST /api/v1/compute/{id}/{provision\|start\|stop\|deprovision}?wait=&timeout_s=` | admin | Audited. 403 `lifecycle_disabled` unless the environment sets `allow_lifecycle`; 501 if the adapter cannot (local, Colab); 409 for resources OMF does not own; 502 `compute_error` for backend failures |
 | `GET /api/v1/storage` | user | `StorageStatus[]` |
 | `GET /api/v1/storage/{sid}/artifacts?prefix=` | user | |
 | `POST /api/v1/storage/{sid}/artifacts` | admin | Multipart `key` + `file`. Key, content type (allowlist) and size are validated. |
@@ -86,7 +87,7 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
 | `GET /api/v1/settings` | user | `{runtime, read_only}` |
 | `PATCH /api/v1/settings` | admin | Validated (unknown keys and `routing.mode: explicit` are rejected), persisted, audited |
 | `GET /api/v1/requests/recent?limit=` | user | `InferenceRecord[]` (no prompt content) |
-| `GET /api/v1/metrics/summary?window=` | user | Per-provider count, error rate, p50/p95 latency, mean TTFT, tokens/s |
+| `GET /api/v1/metrics/summary?window=&operation=chat\|embeddings` | user | Per-provider count, error rate, p50/p95 latency, mean TTFT, tokens/s, for one operation (default `chat`) |
 | `GET /api/v1/metrics/telemetry` | user | In-process telemetry aggregates |
 | `GET /api/v1/audit` | admin | |
 | `GET /api/v1/secrets` | admin | Secret references from the profile and from all providers, with availability. Never values. |
@@ -105,6 +106,30 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
   "required_capabilities": []
 }
 ```
+
+### Embeddings request
+
+```jsonc
+{
+  "input": ["first text", "second text"],  // or a single string; 1-256 non-empty texts
+  "provider_id": null,                     // optional; explicit routing, no fallback
+  "model": null,                           // default: first model declaring `embeddings`
+  "dimensions": null,                      // optional; only some models support it
+  "sensitivity": "normal"
+}
+```
+
+The response has `data: [{index, embedding}]` in input order, plus `dimensions`, `usage`,
+`timings` and `route`. Routing requires the `embeddings` capability. The default *chat*
+model is never used for embeddings. Adapters:
+
+- `mock`: model `mock-embed`, 64-dimensional word-hashing vectors (no semantics);
+- `ollama`: `POST /api/embed`;
+- `openai_compatible`: `POST /embeddings`, for example vLLM with `--task embed`,
+  llama.cpp with `--embeddings`, or TEI.
+
+On OpenAI-compatible servers, declare the model as `capabilities: [embeddings]`, because
+`/v1/models` cannot say which models embed.
 
 `content` can also be a list of parts:
 `{"type": "text", "text": "..."}` and
