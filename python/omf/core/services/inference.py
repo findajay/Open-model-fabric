@@ -84,6 +84,9 @@ class ChatCommand:
     required_capabilities: set[Capability] = field(default_factory=set)
     request_id: str = field(default_factory=lambda: new_id("req"))
     record: bool = True
+    owner: str | None = None
+    """Principal making the request; conversations are scoped to their owner."""
+    owner_is_admin: bool = False
 
 
 def estimate_tokens(text: str) -> int:
@@ -110,7 +113,10 @@ class InferenceService:
         conversations: ConversationRepository,
         records: InferenceRecordRepository,
         telemetry: TelemetryProvider,
+        *,
+        log_prompt_content: bool = False,
     ) -> None:
+        self._log_prompts = log_prompt_content
         self._providers = providers
         self._router = router
         self._health = health
@@ -119,6 +125,7 @@ class InferenceService:
         self._records = records
         self._telemetry = telemetry
         self._inflight: dict[str, tuple[asyncio.Task[Any], list[str]]] = {}
+        self._owners: dict[str, str | None] = {}
         self._background: set[asyncio.Task[None]] = set()
 
     # ================================================================ public API
@@ -126,6 +133,7 @@ class InferenceService:
     async def complete(self, cmd: ChatCommand) -> InferenceResponse:
         task: asyncio.Task[InferenceResponse] = asyncio.create_task(self._complete(cmd))
         self._inflight[cmd.request_id] = (task, [])
+        self._owners[cmd.request_id] = cmd.owner
         try:
             return await task
         except asyncio.CancelledError:
@@ -137,12 +145,14 @@ class InferenceService:
             raise
         finally:
             self._inflight.pop(cmd.request_id, None)
+            self._owners.pop(cmd.request_id, None)
 
     async def stream(self, cmd: ChatCommand) -> AsyncGenerator[StreamEvent, None]:
         """Yield normalised events. Closing the iterator cancels the request."""
         queue: asyncio.Queue[StreamEvent | None] = asyncio.Queue()
         task: asyncio.Task[None] = asyncio.create_task(self._produce(cmd, queue))
         self._inflight[cmd.request_id] = (task, [])
+        self._owners[cmd.request_id] = cmd.owner
         finished = False
         try:
             while True:
@@ -168,18 +178,18 @@ class InferenceService:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await asyncio.shield(task)
             self._inflight.pop(cmd.request_id, None)
+            self._owners.pop(cmd.request_id, None)
 
     async def preflight(self, cmd: ChatCommand, *, streaming: bool) -> RoutePlan:
         """Validate and route without side effects, so that streaming endpoints can return a
         proper HTTP error before the event stream starts."""
-        if (
-            cmd.conversation_id
-            and await self._conversations.get_conversation(
-                cmd.conversation_id, include_messages=False
+        if cmd.conversation_id:
+            self._check_owner(
+                cmd,
+                await self._conversations.get_conversation(
+                    cmd.conversation_id, include_messages=False
+                ),
             )
-            is None
-        ):
-            raise ConversationNotFound(f"conversation {cmd.conversation_id!r} not found")
         return await self._router.plan(
             self._route_request(cmd, streaming=streaming), self._settings.routing_policy()
         )
@@ -200,9 +210,12 @@ class InferenceService:
             default_model=self._settings.current.default_model,
         )
 
-    async def cancel(self, request_id: str) -> bool:
+    async def cancel(
+        self, request_id: str, *, owner: str | None = None, is_admin: bool = True
+    ) -> bool:
+        """Cancel an in-flight request. Non-admin callers can only cancel their own."""
         entry = self._inflight.get(request_id)
-        if entry is None:
+        if entry is None or (not is_admin and self._owners.get(request_id) != owner):
             return False
         task, provider_ids = entry
         for pid in provider_ids[-1:]:
@@ -212,8 +225,8 @@ class InferenceService:
         _cancel_once(task)
         return True
 
-    def inflight(self) -> list[str]:
-        return list(self._inflight)
+    def inflight(self, *, owner: str | None = None, is_admin: bool = True) -> list[str]:
+        return [r for r in self._inflight if is_admin or self._owners.get(r) == owner]
 
     # ================================================================ preparation
 
@@ -223,20 +236,38 @@ class InferenceService:
         conversation: Conversation | None = None
         history: list[ChatMessage] = []
         if cmd.conversation_id:
-            conversation = await self._conversations.get_conversation(cmd.conversation_id)
-            if conversation is None:
-                raise ConversationNotFound(f"conversation {cmd.conversation_id!r} not found")
+            conversation = self._check_owner(
+                cmd, await self._conversations.get_conversation(cmd.conversation_id)
+            )
             history = conversation.messages
         # Route before creating anything, so a rejected request leaves no empty conversation.
         plan = await self._router.plan(
             self._route_request(cmd, streaming=streaming), self._settings.routing_policy()
         )
+        if self._log_prompts:
+            # Opt-in only (security.log_prompt_content); off by default.
+            self._telemetry.record_event(
+                "omf.chat.prompt",
+                {"request_id": cmd.request_id, "prompt": "\n".join(m.text() for m in cmd.messages)},
+            )
         if conversation is None and cmd.persist:
             first_user = next((m.text() for m in cmd.messages if m.role == Role.USER), "")
-            conversation = Conversation(title=(first_user[:60] or "New conversation"))
+            conversation = Conversation(
+                title=(first_user[:60] or "New conversation"), owner=cmd.owner
+            )
             await self._conversations.create_conversation(conversation)
             cmd.conversation_id = conversation.id
         return plan, [*history, *cmd.messages], conversation
+
+    @staticmethod
+    def _check_owner(cmd: ChatCommand, conversation: Conversation | None) -> Conversation:
+        visible = conversation is not None and (
+            cmd.owner_is_admin or conversation.owner is None or conversation.owner == cmd.owner
+        )
+        if not visible or conversation is None:
+            # Same error for "missing" and "not yours": do not reveal other users' ids.
+            raise ConversationNotFound(f"conversation {cmd.conversation_id!r} not found")
+        return conversation
 
     def _check_context(
         self, deployment: ModelDeployment, messages: list[ChatMessage], params: GenerationParams

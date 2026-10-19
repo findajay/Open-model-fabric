@@ -1,0 +1,6692 @@
+{
+  "components": {
+    "schemas": {
+      "ArtifactRef": {
+        "properties": {
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          },
+          "storage_provider_id": {
+            "title": "Storage Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_provider_id",
+          "key",
+          "format",
+          "quantization",
+          "sha256"
+        ],
+        "title": "ArtifactRef",
+        "type": "object"
+      },
+      "AuditEntry": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "actor",
+          "action",
+          "target",
+          "request_id",
+          "details",
+          "created_at"
+        ],
+        "title": "AuditEntry",
+        "type": "object"
+      },
+      "AuthRequirement": {
+        "enum": [
+          "none",
+          "optional_api_key",
+          "api_key"
+        ],
+        "title": "AuthRequirement",
+        "type": "string"
+      },
+      "BenchmarkDataset": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "prompts": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkPrompt"
+            },
+            "title": "Prompts",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "description",
+          "prompts"
+        ],
+        "title": "BenchmarkDataset",
+        "type": "object"
+      },
+      "BenchmarkPrompt": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "BenchmarkPrompt",
+        "type": "object"
+      },
+      "BenchmarkRequest": {
+        "properties": {
+          "dataset_id": {
+            "default": "smoke",
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "iterations": {
+            "default": 2,
+            "title": "Iterations",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/GenerationParams-Input",
+            "default": {
+              "max_tokens": 128,
+              "response_format": "text",
+              "seed": 42,
+              "temperature": 0.0
+            }
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "warmup_runs": {
+            "default": 0,
+            "title": "Warmup Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "targets"
+        ],
+        "title": "BenchmarkRequest",
+        "type": "object"
+      },
+      "BenchmarkRun": {
+        "properties": {
+          "comparability_notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Comparability Notes",
+            "type": "array"
+          },
+          "comparable": {
+            "default": true,
+            "title": "Comparable",
+            "type": "boolean"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "dataset_version": {
+            "title": "Dataset Version",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "iterations": {
+            "default": 3,
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "Iterations",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 200,
+            "title": "Name",
+            "type": "string"
+          },
+          "params": {
+            "$ref": "#/components/schemas/GenerationParams-Output"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkSample"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BenchmarkStatus",
+            "default": "pending"
+          },
+          "summaries": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkSummary"
+            },
+            "title": "Summaries",
+            "type": "array"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkTarget"
+            },
+            "title": "Targets",
+            "type": "array"
+          },
+          "warmup_runs": {
+            "default": 1,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Warmup Runs",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "status",
+          "dataset_id",
+          "dataset_version",
+          "targets",
+          "params",
+          "warmup_runs",
+          "iterations",
+          "samples",
+          "summaries",
+          "comparable",
+          "comparability_notes",
+          "error",
+          "created_at",
+          "started_at",
+          "completed_at"
+        ],
+        "title": "BenchmarkRun",
+        "type": "object"
+      },
+      "BenchmarkSample": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "iteration": {
+            "title": "Iteration",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "phase": {
+            "enum": [
+              "cold",
+              "warm"
+            ],
+            "title": "Phase",
+            "type": "string"
+          },
+          "prompt_id": {
+            "title": "Prompt Id",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "token_count_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "provider",
+                  "estimated"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Count Source"
+          },
+          "tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Second"
+          },
+          "total_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Ms"
+          },
+          "ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttft Ms"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model",
+          "prompt_id",
+          "iteration",
+          "phase",
+          "ttft_ms",
+          "total_ms",
+          "output_tokens",
+          "token_count_source",
+          "tokens_per_second",
+          "error_code",
+          "error_message"
+        ],
+        "title": "BenchmarkSample",
+        "type": "object"
+      },
+      "BenchmarkStatus": {
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "BenchmarkStatus",
+        "type": "string"
+      },
+      "BenchmarkSummary": {
+        "properties": {
+          "cold_total_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cold Total Ms"
+          },
+          "cold_ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cold Ttft Ms"
+          },
+          "comparability_key": {
+            "title": "Comparability Key",
+            "type": "string"
+          },
+          "environment": {
+            "$ref": "#/components/schemas/TargetEnvironment"
+          },
+          "error_rate": {
+            "title": "Error Rate",
+            "type": "number"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "samples": {
+            "title": "Samples",
+            "type": "integer"
+          },
+          "warm_mean_tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warm Mean Tokens Per Second"
+          },
+          "warm_mean_ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warm Mean Ttft Ms"
+          },
+          "warm_p50_total_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warm P50 Total Ms"
+          },
+          "warm_p95_total_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warm P95 Total Ms"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model",
+          "environment",
+          "comparability_key",
+          "samples",
+          "errors",
+          "error_rate",
+          "cold_total_ms",
+          "cold_ttft_ms",
+          "warm_p50_total_ms",
+          "warm_p95_total_ms",
+          "warm_mean_ttft_ms",
+          "warm_mean_tokens_per_second"
+        ],
+        "title": "BenchmarkSummary",
+        "type": "object"
+      },
+      "BenchmarkTarget": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model"
+        ],
+        "title": "BenchmarkTarget",
+        "type": "object"
+      },
+      "Body_upload_artifact_api_v1_storage__storage_id__artifacts_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "file"
+        ],
+        "title": "Body_upload_artifact_api_v1_storage__storage_id__artifacts_post",
+        "type": "object"
+      },
+      "CancelResult": {
+        "properties": {
+          "cancelled": {
+            "title": "Cancelled",
+            "type": "boolean"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "cancelled"
+        ],
+        "title": "CancelResult",
+        "type": "object"
+      },
+      "Capability": {
+        "enum": [
+          "text_generation",
+          "chat",
+          "vision_input",
+          "embeddings",
+          "tool_calling",
+          "structured_output",
+          "streaming",
+          "audio_input",
+          "audio_output"
+        ],
+        "title": "Capability",
+        "type": "string"
+      },
+      "CapabilityClaim": {
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/Capability"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/Evidence"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability",
+          "evidence",
+          "source",
+          "checked_at"
+        ],
+        "title": "CapabilityClaim",
+        "type": "object"
+      },
+      "CapabilitySet": {
+        "description": "An immutable set of capability claims, at most one (the strongest) per capability.",
+        "properties": {
+          "claims": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CapabilityClaim"
+            },
+            "title": "Claims",
+            "type": "array"
+          }
+        },
+        "required": [
+          "claims"
+        ],
+        "title": "CapabilitySet",
+        "type": "object"
+      },
+      "ChatMessage": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "discriminator": {
+                    "mapping": {
+                      "image": "#/components/schemas/ImagePart-Output",
+                      "text": "#/components/schemas/TextPart-Output"
+                    },
+                    "propertyName": "type"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextPart-Output"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImagePart-Output"
+                    }
+                  ]
+                },
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "role",
+          "content",
+          "id",
+          "created_at",
+          "metadata"
+        ],
+        "title": "ChatMessage",
+        "type": "object"
+      },
+      "ChatMessageIn": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "maxLength": 200000,
+                "type": "string"
+              },
+              {
+                "items": {
+                  "discriminator": {
+                    "mapping": {
+                      "image": "#/components/schemas/ImagePart-Input",
+                      "text": "#/components/schemas/TextPart-Input"
+                    },
+                    "propertyName": "type"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/TextPart-Input"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ImagePart-Input"
+                    }
+                  ]
+                },
+                "maxItems": 64,
+                "type": "array"
+              }
+            ],
+            "title": "Content"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role"
+          }
+        },
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessageIn",
+        "type": "object"
+      },
+      "ChatRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 131072.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessageIn"
+            },
+            "maxItems": 200,
+            "minItems": 1,
+            "title": "Messages",
+            "type": "array"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Provider-native model name or catalog model id",
+            "title": "Model"
+          },
+          "persist": {
+            "default": false,
+            "description": "Create a conversation if none is given",
+            "title": "Persist",
+            "type": "boolean"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Explicit provider; disables fallback",
+            "title": "Provider Id"
+          },
+          "required_capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "title": "Required Capabilities",
+            "type": "array"
+          },
+          "response_format": {
+            "$ref": "#/components/schemas/ResponseFormat",
+            "default": "text"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/Sensitivity",
+            "default": "normal"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          }
+        },
+        "required": [
+          "messages"
+        ],
+        "title": "ChatRequest",
+        "type": "object"
+      },
+      "ComputeEnvironment": {
+        "properties": {
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/EndpointInfo"
+            },
+            "title": "Endpoints",
+            "type": "array"
+          },
+          "ephemeral": {
+            "default": false,
+            "title": "Ephemeral",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "managed": {
+            "default": "automatic",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "title": "Managed",
+            "type": "string"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ComputeOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "resources": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeResources"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/ComputeState",
+            "default": "unknown"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "display_name",
+          "ephemeral",
+          "managed",
+          "state",
+          "resources",
+          "operations",
+          "endpoints",
+          "notes",
+          "details",
+          "checked_at"
+        ],
+        "title": "ComputeEnvironment",
+        "type": "object"
+      },
+      "ComputeOperation": {
+        "enum": [
+          "describe_environment",
+          "get_resources",
+          "get_status",
+          "provision",
+          "start",
+          "stop"
+        ],
+        "title": "ComputeOperation",
+        "type": "string"
+      },
+      "ComputeResources": {
+        "properties": {
+          "accelerator": {
+            "default": "unknown",
+            "enum": [
+              "none",
+              "cuda",
+              "rocm",
+              "mps",
+              "tpu",
+              "unknown"
+            ],
+            "title": "Accelerator",
+            "type": "string"
+          },
+          "architecture": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Architecture"
+          },
+          "cpu_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Count"
+          },
+          "cpu_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Model"
+          },
+          "gpus": {
+            "items": {
+              "$ref": "#/components/schemas/GpuInfo"
+            },
+            "title": "Gpus",
+            "type": "array"
+          },
+          "memory_available_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Available Bytes"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "source": {
+            "default": "detected",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cpu_count",
+          "cpu_model",
+          "architecture",
+          "memory_total_bytes",
+          "memory_available_bytes",
+          "gpus",
+          "accelerator",
+          "source"
+        ],
+        "title": "ComputeResources",
+        "type": "object"
+      },
+      "ComputeState": {
+        "enum": [
+          "online",
+          "degraded",
+          "offline",
+          "unknown"
+        ],
+        "title": "ComputeState",
+        "type": "string"
+      },
+      "Conversation": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "title": {
+            "default": "New conversation",
+            "maxLength": 200,
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "owner",
+          "created_at",
+          "updated_at",
+          "messages"
+        ],
+        "title": "Conversation",
+        "type": "object"
+      },
+      "ConversationCreate": {
+        "properties": {
+          "title": {
+            "default": "New conversation",
+            "maxLength": 200,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "title": "ConversationCreate",
+        "type": "object"
+      },
+      "ConversationUpdate": {
+        "properties": {
+          "title": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "ConversationUpdate",
+        "type": "object"
+      },
+      "DeclaredDeployment-Input": {
+        "description": "Operator declaration of a model served by a provider (unverified until probed).",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeclaredDeployment",
+        "type": "object"
+      },
+      "DeclaredDeployment-Output": {
+        "description": "Operator declaration of a model served by a provider (unverified until probed).",
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "name": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          }
+        },
+        "required": [
+          "name",
+          "model_id",
+          "capabilities",
+          "context_window",
+          "quantization"
+        ],
+        "title": "DeclaredDeployment",
+        "type": "object"
+      },
+      "DeploymentState": {
+        "enum": [
+          "available",
+          "unavailable",
+          "unknown"
+        ],
+        "title": "DeploymentState",
+        "type": "string"
+      },
+      "EndpointInfo": {
+        "properties": {
+          "authorized": {
+            "title": "Authorized",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reachable"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "authorized",
+          "reachable",
+          "checked_at",
+          "message"
+        ],
+        "title": "EndpointInfo",
+        "type": "object"
+      },
+      "Envelope_BenchmarkRun_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BenchmarkRun"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[BenchmarkRun]",
+        "type": "object"
+      },
+      "Envelope_CancelResult_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CancelResult"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[CancelResult]",
+        "type": "object"
+      },
+      "Envelope_ComputeEnvironment_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ComputeEnvironment"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[ComputeEnvironment]",
+        "type": "object"
+      },
+      "Envelope_Conversation_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Conversation"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[Conversation]",
+        "type": "object"
+      },
+      "Envelope_InferenceResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InferenceResponse"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[InferenceResponse]",
+        "type": "object"
+      },
+      "Envelope_MetricsSummary_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MetricsSummary"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[MetricsSummary]",
+        "type": "object"
+      },
+      "Envelope_ModelDefinition_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ModelDefinition"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[ModelDefinition]",
+        "type": "object"
+      },
+      "Envelope_ModelDetail_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ModelDetail"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[ModelDetail]",
+        "type": "object"
+      },
+      "Envelope_OperationResult_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OperationResult"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[OperationResult]",
+        "type": "object"
+      },
+      "Envelope_ProviderHealth_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderHealth"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[ProviderHealth]",
+        "type": "object"
+      },
+      "Envelope_ProviderMutationResult_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderMutationResult"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[ProviderMutationResult]",
+        "type": "object"
+      },
+      "Envelope_ProviderView_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProviderView"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[ProviderView]",
+        "type": "object"
+      },
+      "Envelope_StorageArtifact_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/StorageArtifact"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[StorageArtifact]",
+        "type": "object"
+      },
+      "Envelope_SystemInfo_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SystemInfo"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[SystemInfo]",
+        "type": "object"
+      },
+      "Envelope_dict_str__Any__": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[dict[str, Any]]",
+        "type": "object"
+      },
+      "Envelope_list_AuditEntry__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[AuditEntry]]",
+        "type": "object"
+      },
+      "Envelope_list_BenchmarkDataset__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkDataset"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[BenchmarkDataset]]",
+        "type": "object"
+      },
+      "Envelope_list_BenchmarkRun__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkRun"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[BenchmarkRun]]",
+        "type": "object"
+      },
+      "Envelope_list_ComputeEnvironment__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ComputeEnvironment"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[ComputeEnvironment]]",
+        "type": "object"
+      },
+      "Envelope_list_Conversation__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Conversation"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[Conversation]]",
+        "type": "object"
+      },
+      "Envelope_list_InferenceRecord__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/InferenceRecord"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[InferenceRecord]]",
+        "type": "object"
+      },
+      "Envelope_list_ModelDefinition__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModelDefinition"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[ModelDefinition]]",
+        "type": "object"
+      },
+      "Envelope_list_ModelDeployment__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModelDeployment"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[ModelDeployment]]",
+        "type": "object"
+      },
+      "Envelope_list_ProviderHealth__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderHealth"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[ProviderHealth]]",
+        "type": "object"
+      },
+      "Envelope_list_ProviderView__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderView"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[ProviderView]]",
+        "type": "object"
+      },
+      "Envelope_list_SecretReferenceInfo__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/SecretReferenceInfo"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[SecretReferenceInfo]]",
+        "type": "object"
+      },
+      "Envelope_list_StorageArtifact__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StorageArtifact"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[StorageArtifact]]",
+        "type": "object"
+      },
+      "Envelope_list_StorageStatus__": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/StorageStatus"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[StorageStatus]]",
+        "type": "object"
+      },
+      "Envelope_list_dict_str__Any___": {
+        "properties": {
+          "data": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[dict[str, Any]]]",
+        "type": "object"
+      },
+      "Envelope_list_str__": {
+        "properties": {
+          "data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[list[str]]",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "retryable": {
+            "default": false,
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable",
+          "details"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
+          "retryable": {
+            "default": false,
+            "title": "Retryable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "retryable",
+          "details"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "Evidence": {
+        "description": "How much we trust a capability claim, strongest first.",
+        "enum": [
+          "verified",
+          "provider_reported",
+          "declared"
+        ],
+        "title": "Evidence",
+        "type": "string"
+      },
+      "GenerationParams-Input": {
+        "properties": {
+          "max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 131072.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "response_format": {
+            "$ref": "#/components/schemas/ResponseFormat",
+            "default": "text"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          }
+        },
+        "title": "GenerationParams",
+        "type": "object"
+      },
+      "GenerationParams-Output": {
+        "properties": {
+          "max_tokens": {
+            "anyOf": [
+              {
+                "maximum": 131072.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "response_format": {
+            "$ref": "#/components/schemas/ResponseFormat",
+            "default": "text"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed"
+          },
+          "stop": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "maximum": 2.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "top_p": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 1.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top P"
+          }
+        },
+        "required": [
+          "temperature",
+          "max_tokens",
+          "top_p",
+          "stop",
+          "seed",
+          "response_format"
+        ],
+        "title": "GenerationParams",
+        "type": "object"
+      },
+      "GpuInfo": {
+        "properties": {
+          "driver_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Driver Version"
+          },
+          "memory_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Total Bytes"
+          },
+          "memory_used_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Memory Used Bytes"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "memory_total_bytes",
+          "memory_used_bytes",
+          "driver_version"
+        ],
+        "title": "GpuInfo",
+        "type": "object"
+      },
+      "HealthStatus": {
+        "enum": [
+          "unknown",
+          "up",
+          "degraded",
+          "down",
+          "disabled"
+        ],
+        "title": "HealthStatus",
+        "type": "string"
+      },
+      "ImagePart-Input": {
+        "properties": {
+          "data_base64": {
+            "maxLength": 8000000,
+            "title": "Data Base64",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "type": {
+            "const": "image",
+            "default": "image",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "media_type",
+          "data_base64"
+        ],
+        "title": "ImagePart",
+        "type": "object"
+      },
+      "ImagePart-Output": {
+        "properties": {
+          "data_base64": {
+            "maxLength": 8000000,
+            "title": "Data Base64",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "type": {
+            "const": "image",
+            "default": "image",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "media_type",
+          "data_base64"
+        ],
+        "title": "ImagePart",
+        "type": "object"
+      },
+      "InferenceRecord": {
+        "description": "Observability record for one request. Never contains prompt or completion text.",
+        "properties": {
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "routing_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Routing Policy"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "streaming": {
+            "title": "Streaming",
+            "type": "boolean"
+          },
+          "tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Second"
+          },
+          "ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttft Ms"
+          }
+        },
+        "required": [
+          "request_id",
+          "provider_id",
+          "model",
+          "status",
+          "streaming",
+          "routing_policy",
+          "attempts",
+          "latency_ms",
+          "ttft_ms",
+          "prompt_tokens",
+          "completion_tokens",
+          "tokens_per_second",
+          "error_code",
+          "created_at"
+        ],
+        "title": "InferenceRecord",
+        "type": "object"
+      },
+      "InferenceResponse": {
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "message": {
+            "$ref": "#/components/schemas/ChatMessage"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "route": {
+            "$ref": "#/components/schemas/RouteDecision"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/Timings"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "provider_id",
+          "model",
+          "model_id",
+          "message",
+          "finish_reason",
+          "usage",
+          "timings",
+          "route",
+          "conversation_id"
+        ],
+        "title": "InferenceResponse",
+        "type": "object"
+      },
+      "Locality": {
+        "description": "Data boundary of a provider. Drives the sensitive-prompt routing policy.",
+        "enum": [
+          "local",
+          "external"
+        ],
+        "title": "Locality",
+        "type": "string"
+      },
+      "MessageCompleted": {
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "finish_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finish Reason"
+          },
+          "message_id": {
+            "title": "Message Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/Timings"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "message_id",
+          "conversation_id",
+          "finish_reason",
+          "timings",
+          "usage"
+        ],
+        "title": "MessageCompleted",
+        "type": "object"
+      },
+      "MessageDelta": {
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "index",
+          "delta"
+        ],
+        "title": "MessageDelta",
+        "type": "object"
+      },
+      "MessageStarted": {
+        "properties": {
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "route": {
+            "$ref": "#/components/schemas/RouteDecision"
+          }
+        },
+        "required": [
+          "request_id",
+          "conversation_id",
+          "provider_id",
+          "model",
+          "model_id",
+          "route"
+        ],
+        "title": "MessageStarted",
+        "type": "object"
+      },
+      "Meta": {
+        "properties": {
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "title": "Meta",
+        "type": "object"
+      },
+      "MetricsSummary": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderStats"
+            },
+            "title": "Providers",
+            "type": "array"
+          },
+          "window_requests": {
+            "title": "Window Requests",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "window_requests",
+          "providers"
+        ],
+        "title": "MetricsSummary",
+        "type": "object"
+      },
+      "Modality": {
+        "enum": [
+          "text",
+          "image",
+          "audio",
+          "embedding"
+        ],
+        "title": "Modality",
+        "type": "string"
+      },
+      "ModelCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters"
+          },
+          "provider_aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provider Aliases",
+            "type": "array"
+          },
+          "quantizations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Quantizations",
+            "type": "array"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "runtime_compatibility": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Runtime Compatibility",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "display_name"
+        ],
+        "title": "ModelCreate",
+        "type": "object"
+      },
+      "ModelDefinition": {
+        "properties": {
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitySet"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
+          },
+          "id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "input_modalities": {
+            "items": {
+              "$ref": "#/components/schemas/Modality"
+            },
+            "title": "Input Modalities",
+            "type": "array"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelLicense"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          },
+          "output_modalities": {
+            "items": {
+              "$ref": "#/components/schemas/Modality"
+            },
+            "title": "Output Modalities",
+            "type": "array"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters"
+          },
+          "provider_aliases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Provider Aliases",
+            "type": "array"
+          },
+          "quantizations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Quantizations",
+            "type": "array"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "runtime_compatibility": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Runtime Compatibility",
+            "type": "array"
+          },
+          "source": {
+            "default": "catalog",
+            "enum": [
+              "catalog",
+              "api",
+              "discovered"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "family",
+          "revision",
+          "parameters",
+          "description",
+          "input_modalities",
+          "output_modalities",
+          "context_window",
+          "max_output_tokens",
+          "quantizations",
+          "runtime_compatibility",
+          "license",
+          "artifacts",
+          "capabilities",
+          "provider_aliases",
+          "source"
+        ],
+        "title": "ModelDefinition",
+        "type": "object"
+      },
+      "ModelDeployment": {
+        "description": "A model as served by a specific provider.",
+        "properties": {
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilitySet"
+          },
+          "compute_environment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Environment Id"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "discovered_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovered At"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
+          },
+          "id": {
+            "readOnly": true,
+            "title": "Id",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "provider_model": {
+            "title": "Provider Model",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          },
+          "state": {
+            "$ref": "#/components/schemas/DeploymentState",
+            "default": "unknown"
+          }
+        },
+        "required": [
+          "provider_id",
+          "provider_model",
+          "model_id",
+          "compute_environment_id",
+          "state",
+          "capabilities",
+          "context_window",
+          "quantization",
+          "family",
+          "details",
+          "discovered_at",
+          "id"
+        ],
+        "title": "ModelDeployment",
+        "type": "object"
+      },
+      "ModelDetail": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/ModelDefinition"
+          },
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/ModelDeployment"
+            },
+            "title": "Deployments",
+            "type": "array"
+          }
+        },
+        "required": [
+          "definition",
+          "deployments"
+        ],
+        "title": "ModelDetail",
+        "type": "object"
+      },
+      "ModelLicense": {
+        "description": "Model-weight license metadata. Open weights are not the same as open source:\n``commercial_use`` and ``notes`` capture restrictions that SPDX ids alone miss.",
+        "properties": {
+          "commercial_use": {
+            "default": "unknown",
+            "enum": [
+              "allowed",
+              "restricted",
+              "unknown"
+            ],
+            "title": "Commercial Use",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "spdx_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spdx Id"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "name",
+          "spdx_id",
+          "url",
+          "commercial_use",
+          "notes"
+        ],
+        "title": "ModelLicense",
+        "type": "object"
+      },
+      "OperationResult": {
+        "properties": {
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "message"
+        ],
+        "title": "OperationResult",
+        "type": "object"
+      },
+      "ProviderCapabilities": {
+        "description": "What an *adapter* can do (protocol level). Model capabilities live on deployments.",
+        "properties": {
+          "adapter_type": {
+            "title": "Adapter Type",
+            "type": "string"
+          },
+          "adapter_version": {
+            "title": "Adapter Version",
+            "type": "string"
+          },
+          "authentication": {
+            "$ref": "#/components/schemas/AuthRequirement"
+          },
+          "health_check": {
+            "title": "Health Check",
+            "type": "boolean"
+          },
+          "modalities": {
+            "items": {
+              "$ref": "#/components/schemas/Modality"
+            },
+            "title": "Modalities",
+            "type": "array"
+          },
+          "model_capabilities_source": {
+            "title": "Model Capabilities Source",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderOperation"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "streaming": {
+            "title": "Streaming",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "adapter_type",
+          "adapter_version",
+          "operations",
+          "modalities",
+          "streaming",
+          "health_check",
+          "authentication",
+          "model_capabilities_source"
+        ],
+        "title": "ProviderCapabilities",
+        "type": "object"
+      },
+      "ProviderCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter_type": {
+            "title": "Adapter Type",
+            "type": "string"
+          },
+          "allow_sensitive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Sensitive"
+          },
+          "compute_environment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Environment Id"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Locality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredDeployment-Input"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "timeouts": {
+            "$ref": "#/components/schemas/Timeouts-Input"
+          }
+        },
+        "required": [
+          "id",
+          "adapter_type"
+        ],
+        "title": "ProviderCreate",
+        "type": "object"
+      },
+      "ProviderHealth": {
+        "properties": {
+          "checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "consecutive_failures": {
+            "default": 0,
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus",
+            "default": "unknown"
+          }
+        },
+        "required": [
+          "provider_id",
+          "status",
+          "latency_ms",
+          "checked_at",
+          "message",
+          "error_code",
+          "consecutive_failures"
+        ],
+        "title": "ProviderHealth",
+        "type": "object"
+      },
+      "ProviderMutationResult": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/ProviderView"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "provider",
+          "warnings"
+        ],
+        "title": "ProviderMutationResult",
+        "type": "object"
+      },
+      "ProviderOperation": {
+        "enum": [
+          "list_models",
+          "get_capabilities",
+          "generate",
+          "stream_generate",
+          "health_check",
+          "cancel"
+        ],
+        "title": "ProviderOperation",
+        "type": "string"
+      },
+      "ProviderStats": {
+        "properties": {
+          "error_rate": {
+            "title": "Error Rate",
+            "type": "number"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "mean_tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Tokens Per Second"
+          },
+          "mean_ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Ttft Ms"
+          },
+          "p50_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50 Latency Ms"
+          },
+          "p95_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Latency Ms"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "requests": {
+            "title": "Requests",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "provider_id",
+          "requests",
+          "errors",
+          "error_rate",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "mean_ttft_ms",
+          "mean_tokens_per_second"
+        ],
+        "title": "ProviderStats",
+        "type": "object"
+      },
+      "ProviderTestRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "definition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProviderCreate"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Or test an unsaved definition"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Test an existing provider",
+            "title": "Provider Id"
+          }
+        },
+        "title": "ProviderTestRequest",
+        "type": "object"
+      },
+      "ProviderUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "allow_sensitive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Sensitive"
+          },
+          "compute_environment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Environment Id"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Locality"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DeclaredDeployment-Input"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          },
+          "timeouts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timeouts-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ProviderUpdate",
+        "type": "object"
+      },
+      "ProviderView": {
+        "description": "A provider as exposed over the API. Contains secret *references* only.",
+        "properties": {
+          "adapter_type": {
+            "title": "Adapter Type",
+            "type": "string"
+          },
+          "allow_sensitive": {
+            "title": "Allow Sensitive",
+            "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/ProviderCapabilities"
+          },
+          "compute_environment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Environment Id"
+          },
+          "config": {
+            "additionalProperties": true,
+            "title": "Config",
+            "type": "object"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "health": {
+            "$ref": "#/components/schemas/ProviderHealth"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "locality": {
+            "$ref": "#/components/schemas/Locality"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/DeclaredDeployment-Output"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "origin": {
+            "enum": [
+              "config",
+              "runtime"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "secret_references": {
+            "items": {
+              "$ref": "#/components/schemas/SecretReferenceInfo"
+            },
+            "title": "Secret References",
+            "type": "array"
+          },
+          "timeouts": {
+            "$ref": "#/components/schemas/Timeouts-Output"
+          }
+        },
+        "required": [
+          "id",
+          "adapter_type",
+          "display_name",
+          "enabled",
+          "origin",
+          "locality",
+          "allow_sensitive",
+          "compute_environment_id",
+          "timeouts",
+          "models",
+          "config",
+          "secret_references",
+          "capabilities",
+          "health",
+          "is_default"
+        ],
+        "title": "ProviderView",
+        "type": "object"
+      },
+      "RequestFailed": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          },
+          "partial": {
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "error",
+          "partial"
+        ],
+        "title": "RequestFailed",
+        "type": "object"
+      },
+      "RequestStatus": {
+        "enum": [
+          "pending",
+          "streaming",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RequestStatus",
+        "type": "string"
+      },
+      "ResponseFormat": {
+        "enum": [
+          "text",
+          "json"
+        ],
+        "title": "ResponseFormat",
+        "type": "string"
+      },
+      "Role": {
+        "enum": [
+          "system",
+          "user",
+          "assistant"
+        ],
+        "title": "Role",
+        "type": "string"
+      },
+      "RouteAttempt": {
+        "properties": {
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "selected",
+              "skipped",
+              "failed",
+              "succeeded"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model",
+          "outcome",
+          "reason",
+          "error_code"
+        ],
+        "title": "RouteAttempt",
+        "type": "object"
+      },
+      "RouteDecision": {
+        "properties": {
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/RouteAttempt"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "policy": {
+            "title": "Policy",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "policy",
+          "provider_id",
+          "model",
+          "model_id",
+          "attempts"
+        ],
+        "title": "RouteDecision",
+        "type": "object"
+      },
+      "SecretReferenceInfo": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "reference": {
+            "title": "Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference",
+          "available"
+        ],
+        "title": "SecretReferenceInfo",
+        "type": "object"
+      },
+      "Sensitivity": {
+        "enum": [
+          "normal",
+          "sensitive"
+        ],
+        "title": "Sensitivity",
+        "type": "string"
+      },
+      "StorageArtifact": {
+        "properties": {
+          "content_type": {
+            "default": "application/octet-stream",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Metadata",
+            "type": "object"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "storage_provider_id": {
+            "title": "Storage Provider Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_provider_id",
+          "key",
+          "size_bytes",
+          "sha256",
+          "version",
+          "content_type",
+          "created_at",
+          "metadata"
+        ],
+        "title": "StorageArtifact",
+        "type": "object"
+      },
+      "StorageStatus": {
+        "properties": {
+          "adapter_type": {
+            "title": "Adapter Type",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "intended_use": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Intended Use",
+            "type": "array"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus"
+          },
+          "storage_provider_id": {
+            "title": "Storage Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "storage_provider_id",
+          "adapter_type",
+          "status",
+          "message",
+          "details",
+          "intended_use"
+        ],
+        "title": "StorageStatus",
+        "type": "object"
+      },
+      "SystemInfo": {
+        "properties": {
+          "adapters": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Adapters",
+            "type": "array"
+          },
+          "auth_mode": {
+            "title": "Auth Mode",
+            "type": "string"
+          },
+          "environment": {
+            "title": "Environment",
+            "type": "string"
+          },
+          "name": {
+            "default": "Open Model Fabric",
+            "title": "Name",
+            "type": "string"
+          },
+          "principal": {
+            "title": "Principal",
+            "type": "string"
+          },
+          "profile": {
+            "title": "Profile",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "profile",
+          "environment",
+          "auth_mode",
+          "principal",
+          "role",
+          "adapters"
+        ],
+        "title": "SystemInfo",
+        "type": "object"
+      },
+      "TargetEnvironment": {
+        "description": "What must match for two benchmark results to be comparable.",
+        "properties": {
+          "adapter_type": {
+            "title": "Adapter Type",
+            "type": "string"
+          },
+          "compute_environment_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compute Environment Id"
+          },
+          "hardware": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComputeResources"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hardware_fingerprint": {
+            "default": "unknown",
+            "title": "Hardware Fingerprint",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "model_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Revision"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantization"
+          }
+        },
+        "required": [
+          "provider_id",
+          "adapter_type",
+          "model",
+          "model_revision",
+          "quantization",
+          "compute_environment_id",
+          "hardware",
+          "hardware_fingerprint"
+        ],
+        "title": "TargetEnvironment",
+        "type": "object"
+      },
+      "TextPart-Input": {
+        "properties": {
+          "text": {
+            "maxLength": 200000,
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "text",
+            "default": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "TextPart",
+        "type": "object"
+      },
+      "TextPart-Output": {
+        "properties": {
+          "text": {
+            "maxLength": 200000,
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "const": "text",
+            "default": "text",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "text"
+        ],
+        "title": "TextPart",
+        "type": "object"
+      },
+      "Timeouts-Input": {
+        "properties": {
+          "connect_s": {
+            "default": 5.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 120.0,
+            "title": "Connect S",
+            "type": "number"
+          },
+          "read_s": {
+            "default": 120.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 3600.0,
+            "title": "Read S",
+            "type": "number"
+          },
+          "total_s": {
+            "default": 300.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 7200.0,
+            "title": "Total S",
+            "type": "number"
+          }
+        },
+        "title": "Timeouts",
+        "type": "object"
+      },
+      "Timeouts-Output": {
+        "properties": {
+          "connect_s": {
+            "default": 5.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 120.0,
+            "title": "Connect S",
+            "type": "number"
+          },
+          "read_s": {
+            "default": 120.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 3600.0,
+            "title": "Read S",
+            "type": "number"
+          },
+          "total_s": {
+            "default": 300.0,
+            "exclusiveMinimum": 0.0,
+            "maximum": 7200.0,
+            "title": "Total S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "connect_s",
+          "read_s",
+          "total_s"
+        ],
+        "title": "Timeouts",
+        "type": "object"
+      },
+      "Timings": {
+        "properties": {
+          "tokens_per_second": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Per Second"
+          },
+          "total_ms": {
+            "title": "Total Ms",
+            "type": "number"
+          },
+          "ttft_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttft Ms"
+          }
+        },
+        "required": [
+          "total_ms",
+          "ttft_ms",
+          "tokens_per_second"
+        ],
+        "title": "Timings",
+        "type": "object"
+      },
+      "TokenUsage": {
+        "properties": {
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "source": {
+            "default": "provider",
+            "enum": [
+              "provider",
+              "estimated"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "required": [
+          "prompt_tokens",
+          "completion_tokens",
+          "total_tokens",
+          "source"
+        ],
+        "title": "TokenUsage",
+        "type": "object"
+      },
+      "UsageReported": {
+        "properties": {
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/TokenUsage"
+          }
+        },
+        "required": [
+          "request_id",
+          "usage"
+        ],
+        "title": "UsageReported",
+        "type": "object"
+      },
+      "VerifyRequest": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider_id",
+          "model"
+        ],
+        "title": "VerifyRequest",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "\nProvider-neutral AI application platform: one gateway in front of interchangeable\ninference engines (mock, Ollama, any OpenAI-compatible server), with a model registry,\ncapability evidence, routing policies, streaming, benchmarks and pluggable storage.\n\nAll JSON responses use the envelope `{\"data\": ..., \"meta\": {\"request_id\": ...}}`; all\nerrors use `{\"error\": {\"code\", \"message\", \"request_id\", \"retryable\", \"details\"}}`.\n",
+    "title": "Open Model Fabric API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/adapters": {
+      "get": {
+        "operationId": "list_adapters_api_v1_adapters_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_dict_str__Any___"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Adapter types compiled into this build",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/api/v1/audit": {
+      "get": {
+        "operationId": "audit_log_api_v1_audit_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_AuditEntry__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Audit log (admin)",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/benchmarks": {
+      "get": {
+        "operationId": "list_benchmarks_api_v1_benchmarks_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_BenchmarkRun__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List Benchmarks",
+        "tags": [
+          "benchmarks"
+        ]
+      },
+      "post": {
+        "operationId": "start_benchmark_api_v1_benchmarks_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "wait",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Wait",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BenchmarkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_BenchmarkRun_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Start a benchmark run",
+        "tags": [
+          "benchmarks"
+        ]
+      }
+    },
+    "/api/v1/benchmarks/datasets": {
+      "get": {
+        "operationId": "datasets_api_v1_benchmarks_datasets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_BenchmarkDataset__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Versioned prompt datasets",
+        "tags": [
+          "benchmarks"
+        ]
+      }
+    },
+    "/api/v1/benchmarks/{run_id}": {
+      "get": {
+        "operationId": "get_benchmark_api_v1_benchmarks__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_BenchmarkRun_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get Benchmark",
+        "tags": [
+          "benchmarks"
+        ]
+      }
+    },
+    "/api/v1/benchmarks/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancel_benchmark_api_v1_benchmarks__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Cancel Benchmark",
+        "tags": [
+          "benchmarks"
+        ]
+      }
+    },
+    "/api/v1/benchmarks/{run_id}/export": {
+      "get": {
+        "operationId": "export_benchmark_api_v1_benchmarks__run_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "csv",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {},
+              "text/csv": {}
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Export a run as CSV (samples) or JSON (full run)",
+        "tags": [
+          "benchmarks"
+        ]
+      }
+    },
+    "/api/v1/benchmarks/{run_id}/export-to-storage": {
+      "post": {
+        "operationId": "export_to_storage_api_v1_benchmarks__run_id__export_to_storage_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "storage_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Storage Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "enum": [
+                "csv",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_StorageArtifact_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Store an export in an artifact store (e.g. Google Drive)",
+        "tags": [
+          "benchmarks"
+        ]
+      }
+    },
+    "/api/v1/chat/completions": {
+      "post": {
+        "operationId": "chat_completion_api_v1_chat_completions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_InferenceResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Non-streaming chat completion",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/requests": {
+      "get": {
+        "operationId": "inflight_api_v1_chat_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_str__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Ids of in-flight requests",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/requests/{request_id}/cancel": {
+      "post": {
+        "operationId": "cancel_request_api_v1_chat_requests__request_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_CancelResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Cancel an in-flight request",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/chat/stream": {
+      "post": {
+        "operationId": "chat_stream_api_v1_chat_stream_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "Events: message.started, message.delta, usage.reported, message.completed, request.failed"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Streaming chat completion (Server-Sent Events)",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/compute": {
+      "get": {
+        "operationId": "list_compute_api_v1_compute_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ComputeEnvironment__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Compute environments",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/compute/{environment_id}": {
+      "get": {
+        "operationId": "get_compute_api_v1_compute__environment_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "environment_id",
+            "required": true,
+            "schema": {
+              "title": "Environment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ComputeEnvironment_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get Compute",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/compute/{environment_id}/{operation}": {
+      "post": {
+        "operationId": "compute_operation_api_v1_compute__environment_id___operation__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "environment_id",
+            "required": true,
+            "schema": {
+              "title": "Environment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "operation",
+            "required": true,
+            "schema": {
+              "enum": [
+                "provision",
+                "start",
+                "stop"
+              ],
+              "title": "Operation",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ComputeEnvironment_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Lifecycle operation (501 operation_not_supported unless the adapter supports it)",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/conversations": {
+      "get": {
+        "operationId": "list_conversations_api_v1_conversations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "all_users",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "All Users",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_Conversation__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Conversations of the caller (admins: all_users=true lists everyone's)",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "post": {
+        "operationId": "create_conversation_api_v1_conversations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Conversation_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Create Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/conversations/{conversation_id}": {
+      "delete": {
+        "operationId": "delete_conversation_api_v1_conversations__conversation_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Delete Conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "get": {
+        "operationId": "get_conversation_api_v1_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_Conversation_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get Conversation",
+        "tags": [
+          "conversations"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_conversation_api_v1_conversations__conversation_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "conversation_id",
+            "required": true,
+            "schema": {
+              "title": "Conversation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Rename Conversation",
+        "tags": [
+          "conversations"
+        ]
+      }
+    },
+    "/api/v1/deployments": {
+      "get": {
+        "operationId": "list_deployments_api_v1_deployments_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "provider_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "capability",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Capability"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Capability"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ModelDeployment__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Models as served by providers, with capability evidence",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/v1/deployments/verify": {
+      "post": {
+        "operationId": "verify_deployment_api_v1_deployments_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__Any__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Probe a deployment and record verified capabilities",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/v1/health/providers": {
+      "get": {
+        "operationId": "provider_health_api_v1_health_providers_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ProviderHealth__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Latest provider health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/metrics/summary": {
+      "get": {
+        "operationId": "metrics_summary_api_v1_metrics_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "window",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "title": "Window",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_MetricsSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Per-provider latency and error statistics",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/metrics/telemetry": {
+      "get": {
+        "operationId": "telemetry_snapshot_api_v1_metrics_telemetry_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__Any__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "In-process telemetry aggregates",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "operationId": "list_models_api_v1_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ModelDefinition__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Model catalog (definitions independent of runtime)",
+        "tags": [
+          "models"
+        ]
+      },
+      "post": {
+        "operationId": "register_model_api_v1_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ModelDefinition_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Register a model definition",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/v1/models/{model_id}": {
+      "delete": {
+        "operationId": "delete_model_api_v1_models__model_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Delete Model",
+        "tags": [
+          "models"
+        ]
+      },
+      "get": {
+        "operationId": "get_model_api_v1_models__model_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "model_id",
+            "required": true,
+            "schema": {
+              "title": "Model Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ModelDetail_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Model definition with its deployments",
+        "tags": [
+          "models"
+        ]
+      }
+    },
+    "/api/v1/providers": {
+      "get": {
+        "operationId": "list_providers_api_v1_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ProviderView__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Configured inference providers",
+        "tags": [
+          "providers"
+        ]
+      },
+      "post": {
+        "operationId": "create_provider_api_v1_providers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ProviderMutationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Add a runtime provider",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/api/v1/providers/test": {
+      "post": {
+        "operationId": "test_provider_api_v1_providers_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__Any__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Test connectivity of a saved or unsaved provider",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/api/v1/providers/{provider_id}": {
+      "delete": {
+        "operationId": "delete_provider_api_v1_providers__provider_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Delete Provider",
+        "tags": [
+          "providers"
+        ]
+      },
+      "get": {
+        "operationId": "get_provider_api_v1_providers__provider_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ProviderView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get Provider",
+        "tags": [
+          "providers"
+        ]
+      },
+      "patch": {
+        "operationId": "update_provider_api_v1_providers__provider_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ProviderMutationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Update a provider (config-origin: enable/disable only)",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/api/v1/providers/{provider_id}/health": {
+      "post": {
+        "operationId": "check_provider_health_api_v1_providers__provider_id__health_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_ProviderHealth_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Run a health check now",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/api/v1/providers/{provider_id}/models": {
+      "get": {
+        "operationId": "provider_models_api_v1_providers__provider_id__models_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_id",
+            "required": true,
+            "schema": {
+              "title": "Provider Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_ModelDeployment__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Deployments served by this provider",
+        "tags": [
+          "providers"
+        ]
+      }
+    },
+    "/api/v1/requests/recent": {
+      "get": {
+        "operationId": "recent_requests_api_v1_requests_recent_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_InferenceRecord__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Recent inference requests (no prompt content)",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/secrets": {
+      "get": {
+        "operationId": "secret_references_api_v1_secrets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_SecretReferenceInfo__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Secret references and availability (never values; admin)",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "operationId": "get_settings_api_v1_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__Any__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "system"
+        ]
+      },
+      "patch": {
+        "operationId": "update_settings_api_v1_settings_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_dict_str__Any__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Update runtime settings (validated, persisted, audited)",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/storage": {
+      "get": {
+        "operationId": "list_storage_api_v1_storage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_StorageStatus__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Storage providers and their status",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/storage/{storage_id}/artifact": {
+      "delete": {
+        "operationId": "delete_artifact_api_v1_storage__storage_id__artifact_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Delete Artifact",
+        "tags": [
+          "infrastructure"
+        ]
+      },
+      "get": {
+        "operationId": "artifact_metadata_api_v1_storage__storage_id__artifact_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_StorageArtifact_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Artifact metadata",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/storage/{storage_id}/artifact/content": {
+      "get": {
+        "operationId": "artifact_content_api_v1_storage__storage_id__artifact_content_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Download an artifact (checksum-verified)",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/storage/{storage_id}/artifact/verify": {
+      "post": {
+        "operationId": "verify_artifact_api_v1_storage__storage_id__artifact_verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_OperationResult_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Re-hash stored content",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/storage/{storage_id}/artifacts": {
+      "get": {
+        "operationId": "list_artifacts_api_v1_storage__storage_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "prefix",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Prefix",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_list_StorageArtifact__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List Artifacts",
+        "tags": [
+          "infrastructure"
+        ]
+      },
+      "post": {
+        "operationId": "upload_artifact_api_v1_storage__storage_id__artifacts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "storage_id",
+            "required": true,
+            "schema": {
+              "title": "Storage Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_artifact_api_v1_storage__storage_id__artifacts_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_StorageArtifact_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Upload an artifact (validated key, size and content type)",
+        "tags": [
+          "infrastructure"
+        ]
+      }
+    },
+    "/api/v1/system": {
+      "get": {
+        "operationId": "system_info_api_v1_system_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_SystemInfo_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Version, profile and the calling principal",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "live_health_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Live Health Live Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Liveness: the process is running",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "ready_health_ready_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Readiness: metadata store reachable, providers registered",
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  }
+}

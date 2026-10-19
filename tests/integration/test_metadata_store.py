@@ -125,3 +125,26 @@ async def test_benchmarks_settings_audit_records(store: SqlMetadataStore) -> Non
         )
     )
     assert (await store.recent_records())[0].request_id == "r1"
+
+
+async def test_migration_0002_upgrades_an_existing_0001_database(tmp_path: Path) -> None:
+    from alembic import command
+    from alembic.config import Config as AlembicConfig
+
+    from omf.adapters.metadata.sql import MIGRATIONS
+
+    url = f"sqlite:///{tmp_path}/old.db"
+    engine = create_engine(url)
+    cfg = AlembicConfig()
+    cfg.set_main_option("script_location", str(MIGRATIONS))
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        command.upgrade(cfg, "0001")
+        ts = "2026-01-01T00:00:00+00:00"
+        conn.execute(text(f"INSERT INTO conversations VALUES ('c1', 'old', '{ts}', '{ts}')"))
+    engine.dispose()
+    store = SqlMetadataStore(url)
+    await store.initialize()  # applies 0002 on top of existing data
+    old = await store.get_conversation("c1")
+    assert old is not None and old.owner is None
+    await store.aclose()

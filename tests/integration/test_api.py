@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from omf.bootstrap.config import AppConfig, load_config
@@ -776,3 +777,99 @@ def test_artifact_upload_validation(
         "/api/v1/storage/local/artifact/verify", params={"key": "experiments/a.json"}
     )
     assert verify.json()["data"]["ok"] is True
+
+
+# ---------------------------------------------------------------- review follow-ups
+
+
+def test_conversations_are_scoped_to_their_owner(
+    make_config: Callable[..., AppConfig], make_client: Callable[..., TestClient]
+) -> None:
+    env = {
+        "ALICE": "alice-token-0123456789abcdef",
+        "BOB": "bob-token-0123456789abcdef00",
+        "ROOT": "root-token-0123456789abcdef0",
+    }
+    config = make_config(
+        auth={
+            "mode": "api_key",
+            "tokens": [
+                {"name": "alice", "role": "user", "token_ref": "env:ALICE"},
+                {"name": "bob", "role": "user", "token_ref": "env:BOB"},
+                {"name": "root", "role": "admin", "token_ref": "env:ROOT"},
+            ],
+        }
+    )
+    client = make_client(config, env=env)
+
+    def h(name: str) -> dict[str, str]:
+        return {"Authorization": f"Bearer {env[name]}"}
+
+    created = client.post(
+        "/api/v1/chat/completions",
+        headers=h("ALICE"),
+        json={"messages": [{"role": "user", "content": "private"}], "persist": True},
+    ).json()["data"]
+    conv = created["conversation_id"]
+    assert client.get(f"/api/v1/conversations/{conv}", headers=h("ALICE")).status_code == 200
+    # bob cannot read, extend, rename or delete it, and gets the same 404 as for a missing id
+    assert client.get(f"/api/v1/conversations/{conv}", headers=h("BOB")).status_code == 404
+    extend = client.post(
+        "/api/v1/chat/completions",
+        headers=h("BOB"),
+        json={"messages": [{"role": "user", "content": "x"}], "conversation_id": conv},
+    )
+    assert extend.status_code == 404
+    assert client.delete(f"/api/v1/conversations/{conv}", headers=h("BOB")).status_code == 404
+    assert client.get("/api/v1/conversations", headers=h("BOB")).json()["data"] == []
+    assert len(client.get("/api/v1/conversations", headers=h("ALICE")).json()["data"]) == 1
+    everyone = client.get("/api/v1/conversations?all_users=true", headers=h("ROOT")).json()["data"]
+    assert [c["owner"] for c in everyone] == ["alice"]
+
+
+def test_settings_reject_unknown_keys_and_explicit_mode(
+    make_config: Callable[..., AppConfig], make_client: Callable[..., TestClient]
+) -> None:
+    client = make_client(make_config())
+    assert client.patch("/api/v1/settings", json={"default_provder_id": "mock"}).status_code == 422
+    assert (
+        client.patch("/api/v1/settings", json={"routing": {"mode": "explicit"}}).status_code == 422
+    )
+
+
+def test_down_provider_is_reported_as_unavailable_not_disabled(
+    make_config: Callable[..., AppConfig], make_client: Callable[..., TestClient]
+) -> None:
+    client = make_client(
+        make_config(
+            providers=[
+                {
+                    "id": "dead",
+                    "adapter_type": "ollama",
+                    "config": {"base_url": "http://127.0.0.1:9"},
+                    "timeouts": {"connect_s": 1, "read_s": 1, "total_s": 2},
+                },
+            ],
+            inference={"default_provider": "dead", "default_model": "qwen2.5:0.5b"},
+        )
+    )
+    client.get("/api/v1/health/providers?refresh=true")
+    response = chat(client)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "provider_unavailable"
+
+
+def test_prompt_content_is_logged_only_when_opted_in(
+    make_config: Callable[..., AppConfig],
+    make_client: Callable[..., TestClient],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("INFO", logger="omf.telemetry")
+    client = make_client(make_config())
+    chat(client, messages=[{"role": "user", "content": "do-not-log-me"}])
+    assert "do-not-log-me" not in caplog.text
+    opted_in = make_client(
+        make_config(security={"egress": {"allow_loopback": True}, "log_prompt_content": True})
+    )
+    chat(opted_in, messages=[{"role": "user", "content": "please-log-me"}])
+    assert "please-log-me" in caplog.text

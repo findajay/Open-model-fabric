@@ -110,13 +110,25 @@ class GoogleDriveStorageAdapter(ArtifactStorageProvider):
         self._config = config
         self._token = token_source
         self._chunk = config.chunk_size_mb * 1024 * 1024 // _CHUNK_UNIT * _CHUNK_UNIT
+        # Redirects are followed only to Google-owned hosts (Drive media downloads may be
+        # served from googleusercontent.com); anything else is refused, not fetched.
+        api_host = httpx.URL(config.api_base).host
+        self._allowed_hosts = (api_host, ".googleusercontent.com", ".googleapis.com")
         self._client = httpx.AsyncClient(
             base_url=config.api_base,
             timeout=config.timeout_s,
             follow_redirects=True,
             transport=transport,
+            event_hooks={"request": [self._check_host]},
         )
         self._locks: dict[str, asyncio.Lock] = {}
+
+    async def _check_host(self, request: httpx.Request) -> None:
+        host = request.url.host
+        if not any(
+            host == h or (h.startswith(".") and host.endswith(h)) for h in self._allowed_hosts
+        ):
+            raise StorageError(f"refusing to contact unexpected host {host!r} (redirect?)")
 
     async def aclose(self) -> None:
         await self._client.aclose()

@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ConfigDict, Field, ValidationError
 
+from omf.core.domain.base import DomainModel
 from omf.core.domain.errors import ValidationFailed
 from omf.core.domain.models import RoutingMode, RoutingPolicy
 from omf.core.ports.metadata import SettingsRepository
@@ -20,7 +21,9 @@ from omf.core.services.provider_registry import ProviderRegistry
 SETTINGS_KEY = "runtime_settings"
 
 
-class RuntimeSettings(BaseModel):
+class RuntimeSettings(DomainModel):
+    model_config = ConfigDict(extra="forbid")
+
     default_provider_id: str | None = None
     default_model: str | None = None
     routing: RoutingPolicy = Field(default_factory=RoutingPolicy)
@@ -112,6 +115,10 @@ class SettingsService:
         if s.default_storage_id and s.default_storage_id not in self._storage_ids:
             raise ValidationFailed("unknown storage provider", details={"id": s.default_storage_id})
         r = s.routing
+        if r.mode == RoutingMode.EXPLICIT:
+            raise ValidationFailed(
+                "'explicit' is not a routing policy setting: pass provider_id in the request"
+            )
         if r.mode == RoutingMode.PREFERRED_WITH_FALLBACK and not r.preferred_provider_ids:
             raise ValidationFailed("preferred_with_fallback routing needs preferred_provider_ids")
         if r.fallback_provider_ids and not r.allow_cross_provider_fallback:

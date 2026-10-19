@@ -20,8 +20,9 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import Field, computed_field, field_validator
 
+from omf.core.domain.base import DomainModel
 from omf.core.domain.capabilities import Capability, CapabilitySet, Modality
 
 
@@ -96,7 +97,7 @@ class Sensitivity(StrEnum):
 # =====================================================================================
 
 
-class ModelLicense(BaseModel):
+class ModelLicense(DomainModel):
     """Model-weight license metadata. Open weights are not the same as open source:
     ``commercial_use`` and ``notes`` capture restrictions that SPDX ids alone miss."""
 
@@ -107,7 +108,7 @@ class ModelLicense(BaseModel):
     notes: str | None = None
 
 
-class ArtifactRef(BaseModel):
+class ArtifactRef(DomainModel):
     storage_provider_id: str
     key: str
     format: str | None = None  # safetensors, gguf, ...
@@ -115,7 +116,7 @@ class ArtifactRef(BaseModel):
     sha256: str | None = None
 
 
-class ModelDefinition(BaseModel):
+class ModelDefinition(DomainModel):
     id: str = Field(min_length=1, max_length=200)
     display_name: str
     family: str | None = None
@@ -136,7 +137,7 @@ class ModelDefinition(BaseModel):
     source: Literal["catalog", "api", "discovered"] = "catalog"
 
 
-class ModelDeployment(BaseModel):
+class ModelDeployment(DomainModel):
     """A model as served by a specific provider."""
 
     provider_id: str
@@ -157,7 +158,7 @@ class ModelDeployment(BaseModel):
         return f"{self.provider_id}/{self.provider_model}"
 
 
-class DiscoveredModel(BaseModel):
+class DiscoveredModel(DomainModel):
     """What an inference adapter reports in ``list_models``."""
 
     name: str
@@ -202,7 +203,7 @@ class AuthRequirement(StrEnum):
     API_KEY = "api_key"
 
 
-class ProviderCapabilities(BaseModel):
+class ProviderCapabilities(DomainModel):
     """What an *adapter* can do (protocol level). Model capabilities live on deployments."""
 
     adapter_type: str
@@ -216,14 +217,14 @@ class ProviderCapabilities(BaseModel):
     """How model capabilities are learned: ``declared``, ``provider_metadata``, ..."""
 
 
-class Timeouts(BaseModel):
+class Timeouts(DomainModel):
     connect_s: float = Field(default=5.0, gt=0, le=120)
     read_s: float = Field(default=120.0, gt=0, le=3600)
     """Maximum gap between bytes; for streaming this bounds the wait for the next token."""
     total_s: float = Field(default=300.0, gt=0, le=7200)
 
 
-class DeclaredDeployment(BaseModel):
+class DeclaredDeployment(DomainModel):
     """Operator declaration of a model served by a provider (unverified until probed)."""
 
     name: str = Field(min_length=1, max_length=200)
@@ -233,7 +234,7 @@ class DeclaredDeployment(BaseModel):
     quantization: str | None = None
 
 
-class ProviderDefinition(BaseModel):
+class ProviderDefinition(DomainModel):
     id: Slug
     adapter_type: str
     display_name: str | None = None
@@ -252,7 +253,7 @@ class ProviderDefinition(BaseModel):
     updated_at: datetime = Field(default_factory=utcnow)
 
 
-class ProviderHealth(BaseModel):
+class ProviderHealth(DomainModel):
     provider_id: str
     status: HealthStatus = HealthStatus.UNKNOWN
     latency_ms: float | None = None
@@ -267,14 +268,14 @@ class ProviderHealth(BaseModel):
 # =====================================================================================
 
 
-class GpuInfo(BaseModel):
+class GpuInfo(DomainModel):
     name: str
     memory_total_bytes: int | None = None
     memory_used_bytes: int | None = None
     driver_version: str | None = None
 
 
-class ComputeResources(BaseModel):
+class ComputeResources(DomainModel):
     cpu_count: int | None = None
     cpu_model: str | None = None
     architecture: str | None = None
@@ -294,7 +295,7 @@ class ComputeOperation(StrEnum):
     STOP = "stop"  # optional
 
 
-class EndpointInfo(BaseModel):
+class EndpointInfo(DomainModel):
     url: str
     authorized: bool
     """Operator attests that exposing/using this endpoint is permitted by the platform terms."""
@@ -303,7 +304,7 @@ class EndpointInfo(BaseModel):
     message: str | None = None
 
 
-class ComputeEnvironment(BaseModel):
+class ComputeEnvironment(DomainModel):
     id: str
     kind: str  # local, colab_notebook, docker, kubernetes, ...
     display_name: str
@@ -323,7 +324,7 @@ class ComputeEnvironment(BaseModel):
 # =====================================================================================
 
 
-class StorageArtifact(BaseModel):
+class StorageArtifact(DomainModel):
     storage_provider_id: str
     key: str
     size_bytes: int
@@ -334,7 +335,7 @@ class StorageArtifact(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
-class StorageStatus(BaseModel):
+class StorageStatus(DomainModel):
     storage_provider_id: str
     adapter_type: str
     status: HealthStatus
@@ -355,7 +356,7 @@ class Role(StrEnum):
     ASSISTANT = "assistant"
 
 
-class TextPart(BaseModel):
+class TextPart(DomainModel):
     type: Literal["text"] = "text"
     text: str = Field(max_length=200_000)
 
@@ -363,7 +364,7 @@ class TextPart(BaseModel):
 ALLOWED_IMAGE_TYPES = ("image/png", "image/jpeg", "image/webp", "image/gif")
 
 
-class ImagePart(BaseModel):
+class ImagePart(DomainModel):
     type: Literal["image"] = "image"
     media_type: str
     data_base64: str = Field(max_length=8_000_000)  # ~6 MB decoded
@@ -379,7 +380,7 @@ class ImagePart(BaseModel):
 ContentPart = Annotated[TextPart | ImagePart, Field(discriminator="type")]
 
 
-class ChatMessage(BaseModel):
+class ChatMessage(DomainModel):
     role: Role
     content: str | list[ContentPart]
     id: str = Field(default_factory=lambda: new_id("msg"))
@@ -402,7 +403,7 @@ class ResponseFormat(StrEnum):
     JSON = "json"
 
 
-class GenerationParams(BaseModel):
+class GenerationParams(DomainModel):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=1, le=131_072)
     top_p: float | None = Field(default=None, gt=0.0, le=1.0)
@@ -411,7 +412,7 @@ class GenerationParams(BaseModel):
     response_format: ResponseFormat = ResponseFormat.TEXT
 
 
-class InferenceRequest(BaseModel):
+class InferenceRequest(DomainModel):
     """A request as seen by an inference adapter: already routed to one provider/model."""
 
     request_id: str
@@ -420,14 +421,14 @@ class InferenceRequest(BaseModel):
     params: GenerationParams = Field(default_factory=GenerationParams)
 
 
-class TokenUsage(BaseModel):
+class TokenUsage(DomainModel):
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     total_tokens: int | None = None
     source: Literal["provider", "estimated"] = "provider"
 
 
-class GenerationChunk(BaseModel):
+class GenerationChunk(DomainModel):
     """Adapter-level stream item. Adapters normalise engine formats into this shape."""
 
     delta: str = ""
@@ -435,19 +436,19 @@ class GenerationChunk(BaseModel):
     usage: TokenUsage | None = None
 
 
-class GenerationResult(BaseModel):
+class GenerationResult(DomainModel):
     content: str
     finish_reason: str | None = None
     usage: TokenUsage | None = None
 
 
-class Timings(BaseModel):
+class Timings(DomainModel):
     total_ms: float
     ttft_ms: float | None = None
     tokens_per_second: float | None = None
 
 
-class RouteAttempt(BaseModel):
+class RouteAttempt(DomainModel):
     provider_id: str
     model: str
     outcome: Literal["selected", "skipped", "failed", "succeeded"]
@@ -455,7 +456,7 @@ class RouteAttempt(BaseModel):
     error_code: str | None = None
 
 
-class RouteDecision(BaseModel):
+class RouteDecision(DomainModel):
     policy: str
     provider_id: str
     model: str
@@ -463,7 +464,7 @@ class RouteDecision(BaseModel):
     attempts: list[RouteAttempt] = Field(default_factory=list)
 
 
-class InferenceResponse(BaseModel):
+class InferenceResponse(DomainModel):
     request_id: str
     provider_id: str
     model: str
@@ -476,7 +477,7 @@ class InferenceResponse(BaseModel):
     conversation_id: str | None = None
 
 
-class InferenceRecord(BaseModel):
+class InferenceRecord(DomainModel):
     """Observability record for one request. Never contains prompt or completion text."""
 
     request_id: str
@@ -500,9 +501,11 @@ class InferenceRecord(BaseModel):
 # =====================================================================================
 
 
-class Conversation(BaseModel):
+class Conversation(DomainModel):
     id: str = Field(default_factory=lambda: new_id("conv"))
     title: str = Field(default="New conversation", max_length=200)
+    owner: str | None = None
+    """Principal that created it; only the owner (or an admin) may read or extend it."""
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
     messages: list[ChatMessage] = Field(default_factory=list)
@@ -520,7 +523,7 @@ class RoutingMode(StrEnum):
     CAPABILITY_BASED = "capability_based"
 
 
-class RoutingPolicy(BaseModel):
+class RoutingPolicy(DomainModel):
     mode: RoutingMode = RoutingMode.DEFAULT
     default_provider_id: str | None = None
     preferred_provider_ids: list[str] = Field(default_factory=list)
@@ -537,12 +540,12 @@ class RoutingPolicy(BaseModel):
 # =====================================================================================
 
 
-class BenchmarkTarget(BaseModel):
+class BenchmarkTarget(DomainModel):
     provider_id: str
     model: str
 
 
-class BenchmarkSample(BaseModel):
+class BenchmarkSample(DomainModel):
     provider_id: str
     model: str
     prompt_id: str
@@ -557,7 +560,7 @@ class BenchmarkSample(BaseModel):
     error_message: str | None = None
 
 
-class TargetEnvironment(BaseModel):
+class TargetEnvironment(DomainModel):
     """What must match for two benchmark results to be comparable."""
 
     provider_id: str
@@ -570,7 +573,7 @@ class TargetEnvironment(BaseModel):
     hardware_fingerprint: str = "unknown"
 
 
-class BenchmarkSummary(BaseModel):
+class BenchmarkSummary(DomainModel):
     provider_id: str
     model: str
     environment: TargetEnvironment
@@ -586,7 +589,7 @@ class BenchmarkSummary(BaseModel):
     warm_mean_tokens_per_second: float | None = None
 
 
-class BenchmarkRun(BaseModel):
+class BenchmarkRun(DomainModel):
     id: str = Field(default_factory=lambda: new_id("bench"))
     name: str = Field(max_length=200)
     status: BenchmarkStatus = BenchmarkStatus.PENDING
@@ -606,7 +609,7 @@ class BenchmarkRun(BaseModel):
     completed_at: datetime | None = None
 
 
-class AuditEntry(BaseModel):
+class AuditEntry(DomainModel):
     id: str = Field(default_factory=lambda: new_id("audit"))
     actor: str
     action: str

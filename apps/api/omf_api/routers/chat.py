@@ -9,13 +9,13 @@ from omf.core.domain.models import InferenceResponse
 from omf.core.services.inference import ChatCommand
 from omf_api.deps import ContainerDep
 from omf_api.schemas import CancelResult, ChatRequest, Envelope, ok
-from omf_api.security import UserDep
+from omf_api.security import Principal, UserDep
 from omf_api.sse import sse_stream
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
 
-def _command(body: ChatRequest, request: Request) -> ChatCommand:
+def _command(body: ChatRequest, request: Request, principal: Principal) -> ChatCommand:
     return ChatCommand(
         messages=body.domain_messages(),
         provider_id=body.provider_id,
@@ -26,14 +26,16 @@ def _command(body: ChatRequest, request: Request) -> ChatCommand:
         sensitivity=body.sensitivity,
         required_capabilities=set(body.required_capabilities),
         request_id=request.state.request_id,
+        owner=principal.name,
+        owner_is_admin=principal.role == "admin",
     )
 
 
 @router.post("/completions", summary="Non-streaming chat completion")
 async def chat_completion(
-    body: ChatRequest, request: Request, c: ContainerDep, _p: UserDep
+    body: ChatRequest, request: Request, c: ContainerDep, p: UserDep
 ) -> Envelope[InferenceResponse]:
-    return ok(await c.inference.complete(_command(body, request)))
+    return ok(await c.inference.complete(_command(body, request, p)))
 
 
 @router.post(
@@ -49,9 +51,9 @@ async def chat_completion(
     },
 )
 async def chat_stream(
-    body: ChatRequest, request: Request, c: ContainerDep, _p: UserDep
+    body: ChatRequest, request: Request, c: ContainerDep, p: UserDep
 ) -> StreamingResponse:
-    cmd = _command(body, request)
+    cmd = _command(body, request, p)
     # Routing/validation errors are returned as normal HTTP errors before the stream starts;
     # failures after that arrive as a terminal `request.failed` event.
     await c.inference.preflight(cmd, streaming=True)
@@ -68,10 +70,17 @@ async def chat_stream(
 
 
 @router.post("/requests/{request_id}/cancel", summary="Cancel an in-flight request")
-async def cancel_request(request_id: str, c: ContainerDep, _p: UserDep) -> Envelope[CancelResult]:
-    return ok(CancelResult(request_id=request_id, cancelled=await c.inference.cancel(request_id)))
+async def cancel_request(request_id: str, c: ContainerDep, p: UserDep) -> Envelope[CancelResult]:
+    return ok(
+        CancelResult(
+            request_id=request_id,
+            cancelled=await c.inference.cancel(
+                request_id, owner=p.name, is_admin=p.role == "admin"
+            ),
+        )
+    )
 
 
 @router.get("/requests", summary="Ids of in-flight requests")
-async def inflight(c: ContainerDep, _p: UserDep) -> Envelope[list[str]]:
-    return ok(c.inference.inflight())
+async def inflight(c: ContainerDep, p: UserDep) -> Envelope[list[str]]:
+    return ok(c.inference.inflight(owner=p.name, is_admin=p.role == "admin"))

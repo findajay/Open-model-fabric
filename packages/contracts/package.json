@@ -1,0 +1,9 @@
+{
+  "name": "@omf/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "Generated OpenAPI contract of the Open Model Fabric API (do not edit by hand).",
+  "files": ["openapi.json"],
+  "exports": { "./openapi.json": "./openapi.json" }
+}
