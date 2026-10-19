@@ -12,8 +12,9 @@ import re
 from abc import ABC, abstractmethod
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from omf.core.domain.base import DomainModel
 from omf.core.domain.errors import ValidationFailed
 
 SECRET_REF_PATTERN = re.compile(r"^(?P<scheme>[a-z]+):(?P<name>[A-Za-z0-9_./-]{1,512})$")
@@ -28,7 +29,7 @@ SecretRefStr = Annotated[
 ]
 
 
-class SecretRef(BaseModel):
+class SecretRef(DomainModel):
     scheme: str
     name: str
 
@@ -61,7 +62,7 @@ class SecretValue:
     __str__ = __repr__
 
 
-class SecretReferenceInfo(BaseModel):
+class SecretReferenceInfo(DomainModel):
     reference: str
     available: bool
 

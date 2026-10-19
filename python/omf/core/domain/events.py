@@ -12,8 +12,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel
-
+from omf.core.domain.base import DomainModel
 from omf.core.domain.models import RouteDecision, Timings, TokenUsage
 
 
@@ -25,7 +24,7 @@ class StreamEventType(StrEnum):
     FAILED = "request.failed"
 
 
-class MessageStarted(BaseModel):
+class MessageStarted(DomainModel):
     request_id: str
     conversation_id: str | None
     provider_id: str
@@ -34,18 +33,18 @@ class MessageStarted(BaseModel):
     route: RouteDecision
 
 
-class MessageDelta(BaseModel):
+class MessageDelta(DomainModel):
     request_id: str
     index: int
     delta: str
 
 
-class UsageReported(BaseModel):
+class UsageReported(DomainModel):
     request_id: str
     usage: TokenUsage
 
 
-class MessageCompleted(BaseModel):
+class MessageCompleted(DomainModel):
     request_id: str
     message_id: str
     conversation_id: str | None
@@ -54,21 +53,21 @@ class MessageCompleted(BaseModel):
     usage: TokenUsage | None
 
 
-class ErrorBody(BaseModel):
+class ErrorBody(DomainModel):
     code: str
     message: str
     retryable: bool = False
     details: dict[str, Any] = {}
 
 
-class RequestFailed(BaseModel):
+class RequestFailed(DomainModel):
     request_id: str
     error: ErrorBody
     partial: bool
     """True when some deltas were already delivered before the failure."""
 
 
-class StreamEvent(BaseModel):
+class StreamEvent(DomainModel):
     event: StreamEventType
     data: MessageStarted | MessageDelta | UsageReported | MessageCompleted | RequestFailed
 

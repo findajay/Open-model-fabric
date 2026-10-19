@@ -32,6 +32,7 @@ conversations = Table(
     metadata,
     Column("id", String(64), primary_key=True),
     Column("title", String(200), nullable=False),
+    Column("owner", String(100), index=True),
     Column("created_at", String(40), nullable=False),
     Column("updated_at", String(40), nullable=False, index=True),
 )

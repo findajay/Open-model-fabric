@@ -214,7 +214,16 @@ async def build_container(
     )
     await settings.load()
     router = Router(providers, models, health)
-    inference = InferenceService(providers, router, health, settings, metadata, metadata, telemetry)
+    inference = InferenceService(
+        providers,
+        router,
+        health,
+        settings,
+        metadata,
+        metadata,
+        telemetry,
+        log_prompt_content=config.security.log_prompt_content,
+    )
     benchmarks = BenchmarkService(metadata, inference, providers, models, compute)
     audit = AuditService(metadata)
     return Container(

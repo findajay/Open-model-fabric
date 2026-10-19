@@ -12,7 +12,9 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
+
+from omf.core.domain.base import DomainModel
 
 
 class Capability(StrEnum):
@@ -52,7 +54,7 @@ class Modality(StrEnum):
     EMBEDDING = "embedding"
 
 
-class CapabilityClaim(BaseModel):
+class CapabilityClaim(DomainModel):
     model_config = ConfigDict(frozen=True)
 
     capability: Capability
@@ -62,7 +64,7 @@ class CapabilityClaim(BaseModel):
     checked_at: datetime | None = None
 
 
-class CapabilitySet(BaseModel):
+class CapabilitySet(DomainModel):
     """An immutable set of capability claims, at most one (the strongest) per capability."""
 
     model_config = ConfigDict(frozen=True)

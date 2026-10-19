@@ -177,6 +177,7 @@ class SqlMetadataStore(MetadataStore):
                 insert(t.conversations).values(
                     id=conversation.id,
                     title=conversation.title,
+                    owner=conversation.owner,
                     created_at=conversation.created_at.isoformat(),
                     updated_at=conversation.updated_at.isoformat(),
                 )
@@ -227,6 +228,7 @@ class SqlMetadataStore(MetadataStore):
             return Conversation(
                 id=row["id"],
                 title=row["title"],
+                owner=row["owner"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 messages=msgs,
@@ -234,21 +236,20 @@ class SqlMetadataStore(MetadataStore):
 
         return await self._run(work)
 
-    async def list_conversations(self, *, limit: int = 50) -> list[Conversation]:
-        rows = await self._run(
-            lambda c: (
-                c.execute(
-                    select(t.conversations)
-                    .order_by(t.conversations.c.updated_at.desc())
-                    .limit(limit)
-                )
-                .mappings()
-                .all()
-            )
-        )
+    async def list_conversations(
+        self, *, limit: int = 50, owner: str | None = None
+    ) -> list[Conversation]:
+        query = select(t.conversations).order_by(t.conversations.c.updated_at.desc()).limit(limit)
+        if owner is not None:
+            query = query.where(t.conversations.c.owner == owner)
+        rows = await self._run(lambda c: c.execute(query).mappings().all())
         return [
             Conversation(
-                id=r["id"], title=r["title"], created_at=r["created_at"], updated_at=r["updated_at"]
+                id=r["id"],
+                title=r["title"],
+                owner=r["owner"],
+                created_at=r["created_at"],
+                updated_at=r["updated_at"],
             )
             for r in rows
         ]
