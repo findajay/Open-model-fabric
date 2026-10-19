@@ -118,10 +118,7 @@ class EgressPolicy(BaseModel):
         details = {"host": host, "address": str(ip)}
         if ip in _ALWAYS_BLOCKED_IPS:
             raise EgressDenied("cloud metadata endpoints are never allowed", details=details)
-        if ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip.is_reserved:
-            raise EgressDenied(
-                "link-local/multicast/reserved addresses are blocked", details=details
-            )
+        # Loopback first: Python also classifies ::1 as 'reserved' (it lies in ::/8).
         if ip.is_loopback:
             if not self.allow_loopback:
                 raise EgressDenied(
@@ -129,6 +126,10 @@ class EgressPolicy(BaseModel):
                     details=details,
                 )
             return
+        if ip.is_link_local or ip.is_multicast or ip.is_unspecified or ip.is_reserved:
+            raise EgressDenied(
+                "link-local/multicast/reserved addresses are blocked", details=details
+            )
         is_private = ip.is_private or (isinstance(ip, ipaddress.IPv4Address) and ip in _CGNAT)
         if is_private and not self.allow_private_networks:
             raise EgressDenied(
