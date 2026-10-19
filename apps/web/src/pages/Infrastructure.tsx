@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import { HardDrive, RefreshCw } from "lucide-react";
+import type { ComputeEnvironment, ComputeLifecycleOperation } from "@omf/sdk";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { HardDrive, Play, Plus, RefreshCw, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { ErrorAlert } from "@/components/ErrorAlert";
@@ -56,6 +57,55 @@ function Artifacts({ storageId }: { storageId: string }) {
       {artifacts.data?.length === 0 && (
         <p className="text-xs text-muted-foreground">No artifacts.</p>
       )}
+    </div>
+  );
+}
+
+const LIFECYCLE: {
+  op: ComputeLifecycleOperation;
+  label: string;
+  icon: typeof Play;
+  confirm?: string;
+}[] = [
+  { op: "provision", label: "Provision", icon: Plus },
+  { op: "start", label: "Start", icon: Play },
+  { op: "stop", label: "Stop", icon: Square, confirm: "Stop {id}? Running requests will fail." },
+  {
+    op: "deprovision",
+    label: "Deprovision",
+    icon: Trash2,
+    confirm: "Delete the infrastructure of {id}? This cannot be undone.",
+  },
+];
+
+/** Lifecycle buttons; shown only for operations the environment allows (admin only). */
+export function ComputeActions({ env }: { env: ComputeEnvironment }) {
+  const queryClient = useQueryClient();
+  const run = useMutation({
+    mutationFn: (op: ComputeLifecycleOperation) => api.computeOperation(env.id, op),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["compute"] }),
+  });
+  const available = LIFECYCLE.filter((a) => (env.operations ?? []).includes(a.op));
+  if (!available.length) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2">
+        {available.map(({ op, label, icon: Icon, confirm }) => (
+          <Button
+            key={op}
+            size="sm"
+            variant={op === "deprovision" ? "destructive" : "outline"}
+            disabled={run.isPending}
+            onClick={() => {
+              if (confirm && !window.confirm(confirm.replace("{id}", env.id))) return;
+              run.mutate(op);
+            }}
+          >
+            <Icon /> {run.isPending && run.variables === op ? `${label}…` : label}
+          </Button>
+        ))}
+      </div>
+      <ErrorAlert error={run.error} />
     </div>
   );
 }
@@ -155,6 +205,7 @@ export function InfrastructurePage() {
                 <div className="text-muted-foreground">
                   Supported operations: {(env.operations ?? []).join(", ")}
                 </div>
+                <ComputeActions env={env} />
                 {(env.notes ?? []).map((n) => (
                   <p key={n} className="text-muted-foreground">
                     {n}

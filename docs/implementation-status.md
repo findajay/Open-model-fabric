@@ -6,14 +6,17 @@ and the code disagree, the code and its tests are correct.
 
 **How things were verified.** Every claim below is backed by an automated test in the
 repository unless it is marked otherwise. The development sandbox could not reach
-Ollama's model registry, Hugging Face, Google Drive or AWS, and had no Docker daemon or
-GPU. So:
+Ollama's model registry, Hugging Face, Google Drive, AWS, Google Cloud or Azure, and had
+no GPU. A Docker daemon was available only later, for the compute adapters. So:
 
 * real inference engines were replaced by **protocol emulators** (`tests/emulators`) that
   speak the Ollama and OpenAI wire formats;
 * Google Drive was replaced by an in-memory fake of the Drive v3 REST endpoints;
 * S3 was replaced by `moto`;
-* the container image is built only in CI.
+* the container image is built only in CI;
+* the Docker compute adapter ran against a real Docker Engine. The Kubernetes, Compute
+  Engine and Azure adapters ran against in-memory fakes of their REST APIs, and EC2
+  against moto. A local Kubernetes cluster (kind) could not start in the sandbox.
 
 ## Acceptance criteria
 
@@ -127,13 +130,48 @@ The first CI run found two real IPv6 problems that the IPv4-only sandbox had hid
 Both are fixed. GitHub Actions are pinned to major-version tags, not commit SHAs;
 Dependabot keeps them current, and you can pin SHAs for stricter supply-chain control.
 
+## Phase 6 — Managed compute
+
+**Implemented.**
+* Adapters: `docker`, `kubernetes`, `aws_ec2`, `gcp_compute` and `azure_vm` (Azure:
+  start/stop only).
+* An admin-only, audited endpoint: `POST /api/v1/compute/{id}/{operation}`.
+* Lifecycle buttons on the *Infrastructure* screen, shown only for operations the
+  environment allows.
+* The SDK method `computeOperation`.
+* `configs/gpu-infrastructure.example.yaml` and ADR-0012.
+
+**Safety model.**
+* Lifecycle is opt-in (`allow_lifecycle`; otherwise 403 `lifecycle_disabled`).
+* OMF labels or tags what it creates and refuses (409) to touch anything else.
+* One operation at a time per environment.
+* An environment whose secret is missing degrades to `unknown` instead of failing
+  startup.
+
+**Tests.**
+* `tests/integration/test_compute_docker.py` runs against a real Docker Engine; it is
+  skipped when there is no socket. It covers the full lifecycle with a reachable
+  endpoint, the opt-in, refusal to touch a foreign container, and pull failure.
+* `tests/integration/test_compute_cloud.py` runs against REST fakes and moto. It covers
+  request shapes, GPU resources, the ownership refusals and state mapping.
+* An API test covers 403, 502, 501, 404, 422, the degraded environment and audit
+  entries.
+
+**Found while building it.**
+* The inline-secret scanner flagged `env_secret_refs: {HF_TOKEN: env:HF_TOKEN}` as a
+  plain-text secret. Values in a `*_refs` map are now treated as references.
+* Adapter config validation errors included the rejected input values (pydantic's
+  default). A secret misplaced in the wrong field could therefore reach error details.
+  The errors now omit input values.
+
 ## Remaining work (not implemented)
 
 * Tool-calling request/response passthrough, an embeddings endpoint, and audio input and
   output. These capabilities exist in the vocabulary, the catalog and the UI badges
   only.
-* Compute adapters that provision or start resources: Docker, GPU VMs, Kubernetes, AWS,
-  Azure, Google Cloud. The port defines the optional operations.
+* Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
+  provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters
+  against real clusters and accounts.
 * Additional storage adapters: Azure Blob, and a native MinIO adapter (MinIO works today
   through the S3 adapter's `endpoint_url`, but this is untested).
 * SSO/OIDC, token rotation, multi-tenancy beyond per-token conversation ownership, and

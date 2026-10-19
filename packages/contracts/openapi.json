@@ -1067,7 +1067,8 @@
           "get_status",
           "provision",
           "start",
-          "stop"
+          "stop",
+          "deprovision"
         ],
         "title": "ComputeOperation",
         "type": "string"
@@ -5130,10 +5131,33 @@
               "enum": [
                 "provision",
                 "start",
-                "stop"
+                "stop",
+                "deprovision"
               ],
               "title": "Operation",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wait",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Wait",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeout_s",
+            "required": false,
+            "schema": {
+              "default": 300.0,
+              "exclusiveMinimum": 0,
+              "maximum": 3600,
+              "title": "Timeout S",
+              "type": "number"
             }
           }
         ],
@@ -5159,7 +5183,7 @@
             "description": "Default Response"
           }
         },
-        "summary": "Lifecycle operation (501 operation_not_supported unless the adapter supports it)",
+        "summary": "Lifecycle operation (admin). 501 if the adapter cannot, 403 lifecycle_disabled unless the environment allows it",
         "tags": [
           "infrastructure"
         ]

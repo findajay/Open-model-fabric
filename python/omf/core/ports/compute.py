@@ -1,9 +1,12 @@
 """Compute provider port.
 
 Mandatory: ``describe_environment``, ``get_resources``, ``get_status``.
-Optional: ``provision``, ``start``, ``stop`` — raise ``OperationNotSupported`` unless
-the adapter has an authorised mechanism to perform them. For example the Colab adapter
-represents a *manually managed* notebook and therefore implements none of them.
+Optional: ``provision``, ``start``, ``stop``, ``deprovision`` — raise
+``OperationNotSupported`` unless the adapter has an authorised mechanism to perform them.
+For example the Colab adapter represents a *manually managed* notebook and therefore
+implements none of them. Adapters that do implement them must also be enabled by the
+operator (``allow_lifecycle``) and must only touch resources they own (see
+:mod:`omf.adapters.compute._managed`).
 """
 
 from __future__ import annotations
@@ -49,6 +52,10 @@ class ComputeProvider(ABC):
 
     async def stop(self) -> ComputeEnvironment:
         raise self._unsupported(ComputeOperation.STOP)
+
+    async def deprovision(self) -> ComputeEnvironment:
+        """Optional: delete what ``provision`` created (never resources OMF does not own)."""
+        raise self._unsupported(ComputeOperation.DEPROVISION)
 
     async def aclose(self) -> None:
         return None

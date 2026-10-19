@@ -16,6 +16,7 @@ export type ChatMessage = S["ChatMessage"];
 export type InferenceResponse = S["InferenceResponse"];
 export type Conversation = S["Conversation"];
 export type ComputeEnvironment = S["ComputeEnvironment"];
+export type ComputeLifecycleOperation = "provision" | "start" | "stop" | "deprovision";
 export type StorageStatus = S["StorageStatus"];
 export type StorageArtifact = S["StorageArtifact"];
 export type BenchmarkRun = S["BenchmarkRun"];
@@ -236,6 +237,20 @@ export class OmfClient {
 
   compute = (refresh = false) =>
     this.request<ComputeEnvironment[]>("GET", `/api/v1/compute${refresh ? "?refresh=true" : ""}`);
+  /** Lifecycle operation (admin). The environment must allow it (`allow_lifecycle`). */
+  computeOperation = (
+    id: string,
+    operation: ComputeLifecycleOperation,
+    options: { wait?: boolean; timeoutS?: number } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (options.wait) q.set("wait", "true");
+    if (options.timeoutS !== undefined) q.set("timeout_s", String(options.timeoutS));
+    return this.request<ComputeEnvironment>(
+      "POST",
+      `/api/v1/compute/${enc(id)}/${operation}${q.size ? `?${q}` : ""}`,
+    );
+  };
   storage = () => this.request<StorageStatus[]>("GET", "/api/v1/storage");
   artifacts = (storageId: string, prefix = "") =>
     this.request<StorageArtifact[]>(

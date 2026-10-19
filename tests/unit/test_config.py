@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from omf.bootstrap.catalog import COMPUTE_CONFIG_MODELS
 from omf.bootstrap.config import load_config, parse_config
 from omf.core.domain.errors import ConfigurationError
 from tests.conftest import base_config
@@ -14,7 +15,15 @@ CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 
 
 @pytest.mark.parametrize(
-    "profile", ["development", "local-ollama", "colab-experiment", "production.example", "docker"]
+    "profile",
+    [
+        "development",
+        "local-ollama",
+        "colab-experiment",
+        "production.example",
+        "docker",
+        "gpu-infrastructure.example",
+    ],
 )
 def test_shipped_profiles_are_valid(profile: str) -> None:
     env = {
@@ -26,6 +35,8 @@ def test_shipped_profiles_are_valid(profile: str) -> None:
     }
     config = load_config(CONFIGS / f"{profile}.yaml", env)
     assert config.profile
+    for environment in config.compute:  # adapter configs are only parsed at build time
+        COMPUTE_CONFIG_MODELS[environment.adapter].model_validate(environment.config)
 
 
 def test_inline_secret_is_rejected(tmp_path: Path) -> None:
@@ -113,3 +124,24 @@ def test_kubernetes_profile_is_valid_and_catalog_in_sync() -> None:
     raw = yaml.safe_load(configmap["data"]["kubernetes.yaml"])
     raw.pop("model_catalogs")
     assert parse_config(raw, {}).environment == "production"
+
+
+def test_secret_reference_maps_allowed_and_config_errors_never_echo_values(
+    tmp_path: Path,
+) -> None:
+    from omf.bootstrap.catalog import _parse
+    from omf.core.domain.errors import ValidationFailed
+
+    raw = base_config(tmp_path)
+    docker = {
+        "container_name": "vllm",
+        "image": "vllm/vllm-openai:v0.32.0",
+        "env_secret_refs": {"HF_TOKEN": "env:HF_TOKEN"},
+    }
+    raw["compute"].append({"id": "docker", "adapter": "docker", "config": docker})
+    parse_config(raw, {})  # HF_TOKEN maps to a reference, not an inline secret
+    leaked = {**docker, "env_secret_refs": {"HF_TOKEN": "hf_live_SECRET_VALUE"}}
+    with pytest.raises(ValidationFailed) as info:
+        _parse(COMPUTE_CONFIG_MODELS["docker"], leaked, "docker compute")
+    assert "hf_live_SECRET_VALUE" not in repr(info.value.details)
+    assert info.value.details["errors"][0]["loc"] == "env_secret_refs.HF_TOKEN"

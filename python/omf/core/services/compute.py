@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 
-from omf.core.domain.errors import ComputeEnvironmentNotFound, OMFError
-from omf.core.domain.models import ComputeEnvironment, ComputeState, utcnow
+from omf.core.domain.errors import ComputeEnvironmentNotFound, OMFError, ValidationFailed
+from omf.core.domain.models import ComputeEnvironment, ComputeOperation, ComputeState, utcnow
 from omf.core.ports.compute import ComputeProvider
 
 log = logging.getLogger(__name__)
@@ -52,6 +53,42 @@ class ComputeRegistry:
 
     async def describe_all(self, *, refresh: bool = False) -> list[ComputeEnvironment]:
         return list(await asyncio.gather(*(self.describe(i, refresh=refresh) for i in self.ids())))
+
+    async def operate(
+        self,
+        environment_id: str,
+        operation: ComputeOperation,
+        *,
+        wait: bool = False,
+        timeout_s: float = 600.0,
+        poll_s: float = 2.0,
+    ) -> ComputeEnvironment:
+        """Run a lifecycle operation; optionally wait until the environment settles."""
+        provider = self.provider(environment_id)
+        actions = {
+            ComputeOperation.PROVISION: provider.provision,
+            ComputeOperation.START: provider.start,
+            ComputeOperation.STOP: provider.stop,
+            ComputeOperation.DEPROVISION: provider.deprovision,
+        }
+        if operation not in actions:
+            raise ValidationFailed(f"{operation.value} is not a lifecycle operation")
+        env = await actions[operation]()
+        targets = {
+            ComputeOperation.START: {ComputeState.ONLINE},
+            ComputeOperation.STOP: {ComputeState.OFFLINE},
+            ComputeOperation.DEPROVISION: {ComputeState.OFFLINE},
+            ComputeOperation.PROVISION: {ComputeState.OFFLINE, ComputeState.ONLINE},
+        }[operation]
+        if wait and env.state not in targets:
+            deadline = time.monotonic() + timeout_s
+            while time.monotonic() < deadline:
+                await asyncio.sleep(poll_s)
+                if await provider.get_status() in targets:
+                    break
+            env = await self.describe(environment_id, refresh=True)
+        self._cache[environment_id] = env
+        return env
 
     async def aclose(self) -> None:
         for p in self._providers.values():

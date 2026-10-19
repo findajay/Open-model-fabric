@@ -1,0 +1,137 @@
+# GPU infrastructure example: one compute environment per supported backend.
+#
+# Compute adapters describe and (optionally) manage WHERE an inference server runs. The
+# inference provider that talks to it is configured separately (an openai_compatible or
+# ollama provider pointing at the endpoint). Keep only the environments you use.
+#
+# Lifecycle operations (provision/start/stop/deprovision) are disabled unless an
+# environment sets `allow_lifecycle: true`, and then only admins may call them. Adapters
+# label what they create (omf-managed / omf-environment) and refuse to change anything
+# else. See docs/architecture/adr/0012-managed-compute-lifecycle.md.
+profile: production
+environment: production
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+auth:
+  mode: api_key
+  tokens:
+    - name: platform-admin
+      role: admin
+      token_ref: file:/run/secrets/omf_admin_token
+
+security:
+  egress:
+    allow_loopback: false
+    allow_private_networks: true
+  secret_dirs: ["/run/secrets"]
+
+metadata:
+  url_ref: env:OMF_DATABASE_URL
+
+compute:
+  - id: local
+    adapter: local
+
+  # A vLLM container on a Docker host with an NVIDIA GPU (Engine API over the socket).
+  - id: docker-gpu
+    adapter: docker
+    config:
+      display_name: Docker host (vLLM)
+      allow_lifecycle: true
+      docker_host: unix:///var/run/docker.sock
+      container_name: omf-vllm
+      image: vllm/vllm-openai:v0.32.0          # pinned: ':latest' is rejected
+      command: ["--model", "Qwen/Qwen2.5-0.5B-Instruct"]
+      container_port: 8000
+      gpus: all
+      volumes: ["hf-cache:/root/.cache/huggingface"]
+      env_secret_refs:
+        HF_TOKEN: env:HF_TOKEN
+      health_path: /health
+
+  # An OMF-managed Deployment + ClusterIP Service in one namespace.
+  - id: k8s-gpu
+    adapter: kubernetes
+    config:
+      display_name: Kubernetes (vLLM)
+      allow_lifecycle: true
+      in_cluster: true                         # or api_server + token_ref / client_cert_ref
+      namespace: inference
+      name: vllm
+      image: vllm/vllm-openai:v0.32.0
+      args: ["--model", "Qwen/Qwen2.5-0.5B-Instruct"]
+      gpus: 1
+      memory_limit: 24Gi
+      env_from_secrets: [hf-token]             # Kubernetes Secret; values never pass through OMF
+      node_selector:
+        nvidia.com/gpu.product: NVIDIA-L4
+      health_path: /health
+      probe_endpoint: true                     # OMF runs in the same cluster
+
+  # An EC2 GPU instance launched and tagged by OMF; user_data starts the server at boot.
+  - id: aws-gpu
+    adapter: aws_ec2
+    config:
+      display_name: AWS g5.xlarge
+      allow_lifecycle: true
+      region: us-east-1
+      image_id: ami-0123456789abcdef0          # e.g. a Deep Learning AMI
+      instance_type: g5.xlarge
+      subnet_id: subnet-0123456789abcdef0
+      security_group_ids: [sg-0123456789abcdef0]
+      root_volume_gb: 200
+      endpoint_port: 8000
+      health_path: /health
+      user_data: |
+        #!/bin/bash
+        docker run -d --gpus all -p 8000:8000 vllm/vllm-openai:v0.32.0 \
+          --model Qwen/Qwen2.5-0.5B-Instruct
+      # Credentials: default AWS chain (instance role / IRSA) unless set:
+      # access_key_id_ref: env:AWS_ACCESS_KEY_ID
+      # secret_access_key_ref: env:AWS_SECRET_ACCESS_KEY
+
+  # A Compute Engine VM with an L4 GPU, created and labelled by OMF.
+  - id: gcp-gpu
+    adapter: gcp_compute
+    config:
+      display_name: GCE g2-standard-4 (L4)
+      allow_lifecycle: true
+      project: my-gcp-project
+      zone: us-central1-a
+      instance_name: omf-vllm
+      credentials_ref: file:/run/secrets/gcp_service_account.json
+      machine_type: g2-standard-4
+      accelerator_type: nvidia-l4
+      accelerator_count: 1
+      endpoint_port: 8000
+      health_path: /health
+      startup_script: |
+        #!/bin/bash
+        docker run -d --gpus all -p 8000:8000 vllm/vllm-openai:v0.32.0 \
+          --model Qwen/Qwen2.5-0.5B-Instruct
+
+  # An existing Azure VM (created with Bicep/Terraform): start, and stop = deallocate.
+  - id: azure-gpu
+    adapter: azure_vm
+    config:
+      display_name: Azure NC4as T4 v3
+      allow_lifecycle: true
+      subscription_id: 00000000-0000-0000-0000-000000000000
+      resource_group: rg-inference
+      vm_name: vllm-vm
+      tenant_id: 00000000-0000-0000-0000-000000000000
+      client_id: 00000000-0000-0000-0000-000000000000
+      client_secret_ref: env:AZURE_CLIENT_SECRET
+      endpoint_host: 10.0.0.4
+      endpoint_port: 8000
+      health_path: /health
+
+providers:
+  - id: mock
+    adapter_type: mock
+
+inference:
+  default_provider: mock

@@ -13,6 +13,7 @@
 | [0009](0009-sqlalchemy-core-sqlite-postgres-alembic.md) | SQLAlchemy Core + Alembic for SQLite and PostgreSQL | Accepted |
 | [0010](0010-secrets-by-reference-and-egress-policy.md) | Secrets by reference; egress (SSRF) policy | Accepted |
 | [0011](0011-benchmark-comparability.md) | Benchmarks record environment and flag incomparable results | Accepted |
+| [0012](0012-managed-compute-lifecycle.md) | Managed compute lifecycle is opt-in and ownership-bound | Accepted |
 
 Format: Status · Context · Decision · Consequences · Alternatives considered.
 New ADRs take the next number. Superseded ADRs stay in the index and are marked as such.
