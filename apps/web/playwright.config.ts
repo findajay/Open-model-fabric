@@ -36,7 +36,7 @@ const servers: WebServer[] = [
     timeout: 60_000,
   },
   {
-    command: `pnpm exec vite build && pnpm exec vite preview --port ${PORTS.web} --strictPort`,
+    command: `pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1 --port ${PORTS.web} --strictPort`,
     url: `http://127.0.0.1:${PORTS.web}`,
     env: { OMF_API_URL: `http://127.0.0.1:${PORTS.api}` },
     reuseExistingServer: false,
