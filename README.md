@@ -90,7 +90,7 @@ docs                      architecture, ADRs, providers, deployment, security
   for all three storage adapters, persistence across restarts, configuration validation,
   credentials never appearing in API responses, benchmark export, standalone notebook
   execution (smoke mode), and graceful behaviour when Colab is offline. The suite runs
-  against SQLite and PostgreSQL 16/17, and on Python 3.11 and 3.13.
+  against SQLite and PostgreSQL (16 locally, 17 in CI), on Python 3.11 and 3.13, and is green in GitHub Actions (including the browser e2e test, the Docker build and the notebook smoke run).
 * **Tested against protocol emulators, not real engines:** Ollama and OpenAI-compatible
   servers (`tests/emulators`) and Google Drive (`tests/contract/fake_drive.py`). S3 is
   tested with `moto`. Real Ollama, vLLM, Google Drive and AWS were not reachable from the
