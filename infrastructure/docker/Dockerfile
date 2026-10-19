@@ -4,7 +4,7 @@
 #   docker build -f infrastructure/docker/Dockerfile -t open-model-fabric .
 
 # ---------------------------------------------------------------- web build
-FROM node:24.22.0-slim AS web
+FROM node:26.12.0-slim AS web
 WORKDIR /src
 RUN corepack enable && corepack prepare pnpm@10.18.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
