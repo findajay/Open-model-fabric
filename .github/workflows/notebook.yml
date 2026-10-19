@@ -1,0 +1,28 @@
+name: Colab notebook (smoke run)
+
+# Executes notebooks/colab_model_lab.ipynb end to end in smoke mode (tiny random model,
+# no Hugging Face download) on CPU. Heavy dependencies, so it runs weekly and on demand.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+  pull_request:
+    paths: ["notebooks/**", "tests/integration/test_notebook.py"]
+
+permissions:
+  contents: read
+
+jobs:
+  notebook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - run: uv sync --frozen --all-extras
+      - name: Install CPU torch + transformers into the project venv
+        run: >-
+          uv pip install --index-url https://download.pytorch.org/whl/cpu torch &&
+          uv pip install transformers tokenizers nbclient ipykernel
+      - run: uv run --no-sync pytest -q tests/integration/test_notebook.py

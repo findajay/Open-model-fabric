@@ -14,7 +14,7 @@ CONFIGS = Path(__file__).resolve().parents[2] / "configs"
 
 
 @pytest.mark.parametrize(
-    "profile", ["development", "local-ollama", "colab-experiment", "production.example"]
+    "profile", ["development", "local-ollama", "colab-experiment", "production.example", "docker"]
 )
 def test_shipped_profiles_are_valid(profile: str) -> None:
     env = {
@@ -100,3 +100,16 @@ def test_database_url_with_password_rejected(tmp_path: Path) -> None:
 def test_unknown_fields_rejected(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError):
         parse_config(base_config(tmp_path, servre={"port": 1}), {})
+
+
+def test_kubernetes_profile_is_valid_and_catalog_in_sync() -> None:
+    import yaml
+
+    root = CONFIGS.parent / "infrastructure" / "kubernetes"
+    assert (root / "models.yaml").read_text() == (CONFIGS / "models.yaml").read_text(), (
+        "run: cp configs/models.yaml infrastructure/kubernetes/models.yaml"
+    )
+    configmap = yaml.safe_load((root / "configmap.yaml").read_text())
+    raw = yaml.safe_load(configmap["data"]["kubernetes.yaml"])
+    raw.pop("model_catalogs")
+    assert parse_config(raw, {}).environment == "production"

@@ -1,0 +1,4 @@
+packages/sdk-typescript/src/schema.ts
+packages/contracts/openapi.json
+**/dist
+pnpm-lock.yaml

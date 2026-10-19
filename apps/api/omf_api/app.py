@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from omf import __version__
 from omf.bootstrap.config import AppConfig, load_config, resolve_config_path
@@ -122,6 +123,9 @@ def _mount_web(app: FastAPI, web_dir: Path) -> None:
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:  # sync: FastAPI runs it in a worker thread
+        if path.startswith(("api/", "health/")) or path in ("api", "health"):
+            # Unknown API paths must stay JSON 404s, not the HTML shell.
+            raise StarletteHTTPException(status_code=404, detail="Not Found")
         candidate = (web_dir / path).resolve()
         if path and candidate.is_file() and candidate.is_relative_to(web_dir.resolve()):
             return FileResponse(candidate)
