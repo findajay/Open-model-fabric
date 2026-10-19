@@ -1,0 +1,21 @@
+# kubectl apply -k infrastructure/kubernetes   (after creating the secret, see secret.example.yaml)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: open-model-fabric
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - api.yaml
+  - networkpolicy.yaml
+  # Optional dedicated GPU inference (requires the NVIDIA device plugin):
+  # - vllm-gpu.yaml
+images:
+  - name: open-model-fabric
+    newName: ghcr.io/findajay/open-model-fabric
+    newTag: "0.1.0"
+configMapGenerator:
+  # The shared model catalog; regenerate with: cp ../../configs/models.yaml models.yaml
+  - name: omf-model-catalog
+    files: [models.yaml]
+generatorOptions:
+  disableNameSuffixHash: true

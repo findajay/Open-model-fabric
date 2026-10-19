@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omf-config
+data:
+  # Same schema as configs/production.example.yaml. No secrets here: only references.
+  kubernetes.yaml: |
+    profile: kubernetes
+    environment: production
+    server:
+      host: 0.0.0.0
+      port: 8080
+      cors_allow_origins: ["https://omf.example.com"]
+      serve_web_dir: /app/web
+    auth:
+      mode: api_key
+      tokens:
+        - {name: platform-admin, role: admin, token_ref: "file:/run/secrets/omf/omf_admin_token"}
+        - {name: app-backend, role: user, token_ref: "env:OMF_APP_TOKEN"}
+    security:
+      egress:
+        allow_loopback: false
+        allow_private_networks: true
+        allowed_hosts: ["vllm.open-model-fabric.svc.cluster.local"]
+      secret_dirs: ["/run/secrets/omf"]
+    metadata:
+      url_ref: env:OMF_DATABASE_URL
+    compute:
+      - {id: gpu-pool, adapter: local}
+    storage:
+      - id: local
+        adapter: local_fs
+        default: true
+        config: {root: /data/artifacts}
+    providers:
+      - id: vllm
+        adapter_type: openai_compatible
+        display_name: vLLM (GPU)
+        locality: local
+        compute_environment_id: gpu-pool
+        models:
+          - {name: Qwen/Qwen2.5-0.5B-Instruct, model_id: qwen2.5-0.5b-instruct, capabilities: [chat, text_generation]}
+        config:
+          base_url: http://vllm.open-model-fabric.svc.cluster.local:8000/v1
+          api_key_ref: env:VLLM_API_KEY
+      - id: mock
+        adapter_type: mock
+        enabled: false
+    inference:
+      default_provider: vllm
+      default_model: qwen2.5-0.5b-instruct
+    model_catalogs: ["models.yaml"]

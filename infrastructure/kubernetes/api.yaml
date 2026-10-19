@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omf-api
+  labels: {app.kubernetes.io/name: omf-api}
+spec:
+  # SQLite is single-writer; with PostgreSQL (url_ref) you may scale out. In-flight
+  # cancellation is per replica (see ADR-0005): use sticky sessions for cancel calls.
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: omf-api}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: omf-api}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: open-model-fabric
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - {name: OMF_CONFIG, value: /etc/omf/kubernetes.yaml}
+            - {name: OMF_DATA_DIR, value: /data}
+            - name: OMF_APP_TOKEN
+              valueFrom: {secretKeyRef: {name: omf-secrets, key: OMF_APP_TOKEN}}
+            - name: OMF_DATABASE_URL
+              valueFrom: {secretKeyRef: {name: omf-secrets, key: OMF_DATABASE_URL}}
+            - name: VLLM_API_KEY
+              valueFrom: {secretKeyRef: {name: omf-secrets, key: VLLM_API_KEY}}
+          volumeMounts:
+            - {name: config, mountPath: /etc/omf/kubernetes.yaml, subPath: kubernetes.yaml, readOnly: true}
+            - {name: catalog, mountPath: /etc/omf/models.yaml, subPath: models.yaml, readOnly: true}
+            - {name: secrets, mountPath: /run/secrets/omf, readOnly: true}
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: ["ALL"]}
+      volumes:
+        - name: config
+          configMap: {name: omf-config}
+        - name: catalog
+          configMap: {name: omf-model-catalog}
+        - name: secrets
+          secret: {secretName: omf-secrets, items: [{key: omf_admin_token, path: omf_admin_token}]}
+        - name: data
+          emptyDir: {}  # replace with a PersistentVolumeClaim for local artifacts
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: omf-api
+spec:
+  selector: {app.kubernetes.io/name: omf-api}
+  ports: [{name: http, port: 80, targetPort: http}]

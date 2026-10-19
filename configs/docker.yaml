@@ -1,0 +1,55 @@
+# Container profile (Docker Compose / single container).
+# Binds 0.0.0.0, so authentication is required: set OMF_ADMIN_TOKEN (>= 16 chars).
+# Enter the token in the web UI under Settings → API access token.
+profile: docker
+environment: development
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  cors_allow_origins: ["http://localhost:8080", "http://127.0.0.1:8080"]
+  serve_web_dir: /app/web
+
+auth:
+  mode: api_key
+  tokens:
+    - name: admin
+      role: admin
+      token_ref: env:OMF_ADMIN_TOKEN
+
+security:
+  egress:
+    allow_loopback: false
+    allow_private_networks: true   # compose network (e.g. the ollama service)
+
+metadata:
+  url: "sqlite:///${OMF_DATA_DIR:-/data}/omf.db"
+
+compute:
+  - id: local
+    adapter: local
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: "${OMF_DATA_DIR:-/data}/artifacts"
+
+providers:
+  - id: mock
+    adapter_type: mock
+    display_name: Mock provider
+    compute_environment_id: local
+  - id: ollama
+    adapter_type: ollama
+    display_name: Ollama (compose service)
+    enabled: ${OMF_ENABLE_OLLAMA:-false}
+    config:
+      base_url: "${OLLAMA_BASE_URL:-http://ollama:11434}"
+
+inference:
+  default_provider: mock
+  default_model: mock-chat
+
+model_catalogs: ["models.yaml"]
