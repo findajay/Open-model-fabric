@@ -1,0 +1,86 @@
+# Production example: dedicated GPU inference behind an OpenAI-compatible vLLM endpoint,
+# S3-compatible artifact storage, PostgreSQL metadata, API-key authentication.
+# Copy, adapt, and provide every secret through the environment or /run/secrets.
+profile: production
+environment: production
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  cors_allow_origins: ["https://omf.example.com"]
+  max_request_bytes: 4194304
+  serve_web_dir: /app/web
+
+auth:
+  mode: api_key
+  tokens:
+    - name: platform-admin
+      role: admin
+      token_ref: file:/run/secrets/omf_admin_token
+    - name: app-backend
+      role: user
+      token_ref: env:OMF_APP_TOKEN
+
+security:
+  egress:
+    allow_loopback: false
+    allow_private_networks: true        # vLLM runs on the private network
+    allowed_hosts: ["*.internal.example.com"]
+  log_prompt_content: false
+  secret_dirs: ["/run/secrets"]
+
+metadata:
+  url_ref: env:OMF_DATABASE_URL         # postgresql+psycopg://user:pass@host:5432/omf
+
+compute:
+  - id: gpu-pool
+    adapter: local                       # the API host; GPU nodes are described in docs/deployment
+
+storage:
+  - id: artifacts
+    adapter: s3
+    default: true
+    config:
+      bucket: "${S3_BUCKET}"
+      prefix: omf/
+      region: "${AWS_REGION:-us-east-1}"
+      # endpoint_url: https://minio.internal.example.com   # for MinIO
+      # Credentials come from the default AWS chain (IAM role / IRSA) unless set:
+      # access_key_id_ref: env:S3_ACCESS_KEY_ID
+      # secret_access_key_ref: env:S3_SECRET_ACCESS_KEY
+
+providers:
+  - id: vllm
+    adapter_type: openai_compatible
+    display_name: vLLM (dedicated GPU)
+    locality: local                      # operator-controlled infrastructure
+    compute_environment_id: gpu-pool
+    timeouts:
+      connect_s: 3
+      read_s: 120
+      total_s: 300
+    models:
+      - name: Qwen/Qwen2.5-7B-Instruct
+        model_id: qwen2.5-7b-instruct
+        capabilities: [chat, text_generation, structured_output]
+    config:
+      base_url: "${VLLM_BASE_URL}"
+      api_key_ref: env:VLLM_API_KEY
+
+inference:
+  default_provider: vllm
+  default_model: qwen2.5-7b-instruct
+  request_timeout_s: 300
+  routing:
+    mode: default
+
+health:
+  interval_s: 15
+  failure_threshold: 3
+
+telemetry:
+  exporters: [logging]
+  # exporters: [logging, otlp]
+  # otlp_endpoint: http://otel-collector:4318
+
+model_catalogs: ["models.yaml"]

@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+apps/web/dist/
+packages/*/dist/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Runtime state (never commit)
+var/
+*.db
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Model weights / artifacts must never be committed
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+models/
+artifacts/
+
+.DS_Store

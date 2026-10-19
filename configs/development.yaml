@@ -1,0 +1,63 @@
+# Development profile: runs anywhere, no GPU, no network, no cloud accounts.
+#   mock inference + local compute + local filesystem storage + SQLite metadata
+# Start with:  make dev   (or OMF_PROFILE=development uv run omf-api)
+profile: development
+environment: development
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  cors_allow_origins: ["http://localhost:5173", "http://127.0.0.1:5173"]
+
+# Authentication is disabled ONLY because this profile binds to localhost.
+# The config validator refuses auth.mode=none on any other bind address.
+auth:
+  mode: none
+
+security:
+  egress:
+    allow_loopback: true          # local Ollama / vLLM on this machine
+    allow_private_networks: true  # LAN GPU boxes during development
+  log_prompt_content: false
+
+metadata:
+  url: "sqlite:///${OMF_DATA_DIR:-./var}/omf.db"
+
+compute:
+  - id: local
+    adapter: local
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: "${OMF_DATA_DIR:-./var}/artifacts"
+
+providers:
+  - id: mock
+    adapter_type: mock
+    display_name: Mock provider
+    compute_environment_id: local
+
+  # Optional: enabled automatically if Ollama is running (otherwise reported as down,
+  # and the platform keeps working with the mock provider).
+  - id: ollama
+    adapter_type: ollama
+    display_name: Local Ollama
+    enabled: ${OMF_ENABLE_OLLAMA:-false}
+    compute_environment_id: local
+    config:
+      base_url: "${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
+
+inference:
+  default_provider: mock
+  default_model: mock-chat
+  routing:
+    mode: default
+
+health:
+  interval_s: 30
+
+# Shared model catalog (definitions independent of where models run).
+model_catalogs: ["models.yaml"]

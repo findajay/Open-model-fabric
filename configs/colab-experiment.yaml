@@ -1,0 +1,80 @@
+# Colab experiment profile.
+#   * Manually registered Colab notebook environment (ephemeral, manually managed)
+#   * Google Drive artifact storage (model artifacts + experiment outputs)
+#   * Notebook-based inference experiments (notebooks/colab_model_lab.ipynb)
+#   * Optional *authorized* inference endpoint
+#   * SQLite metadata
+#
+# Colab is an interactive notebook product. Free runtimes must not be used as an
+# unattended web-service backend, and Open Model Fabric never tries to keep a runtime
+# alive or reconnect it. Register an endpoint only if your Colab plan and Google's terms
+# explicitly permit it, and set `authorized: true` to attest that. Otherwise leave the
+# endpoint out: the notebook still works standalone, and the app keeps working with the
+# mock/local providers while Colab is offline.
+profile: colab-experiment
+environment: development
+
+server:
+  host: 127.0.0.1
+  port: 8080
+
+auth:
+  mode: none
+
+security:
+  egress:
+    allow_loopback: true
+    allowed_hosts: []   # add your endpoint's host here to restrict egress further
+
+metadata:
+  url: "sqlite:///${OMF_DATA_DIR:-./var}/omf.db"
+
+compute:
+  - id: local
+    adapter: local
+  - id: colab
+    adapter: colab_notebook
+    config:
+      display_name: Colab model lab
+      notebook_url: https://colab.research.google.com/github/open-model-fabric/open-model-fabric/blob/main/notebooks/colab_model_lab.ipynb
+      declared_accelerator: cuda
+      declared_gpu: T4
+      declared_gpu_memory_gb: 15
+      declared_ram_gb: 12
+      # endpoint:
+      #   url: "${COLAB_ENDPOINT_URL}"
+      #   authorized: false      # set true ONLY if permitted by your plan and the terms
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: "${OMF_DATA_DIR:-./var}/artifacts"
+  - id: gdrive
+    adapter: google_drive
+    config:
+      folder_id: "${GDRIVE_FOLDER_ID:-REPLACE_WITH_FOLDER_ID}"
+      credentials_ref: env:GDRIVE_SERVICE_ACCOUNT_JSON
+      namespace: omf
+
+providers:
+  - id: mock
+    adapter_type: mock
+    display_name: Mock provider
+    compute_environment_id: local
+  # Uncomment when an authorized endpoint (e.g. vLLM/llama.cpp started from a paid
+  # runtime that permits it) is running:
+  # - id: colab-endpoint
+  #   adapter_type: openai_compatible
+  #   locality: external
+  #   compute_environment_id: colab
+  #   config:
+  #     base_url: "${COLAB_ENDPOINT_URL}/v1"
+  #     api_key_ref: env:COLAB_ENDPOINT_TOKEN
+
+inference:
+  default_provider: mock
+  default_model: mock-chat
+
+model_catalogs: ["models.yaml"]
