@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from omf.bootstrap.catalog import COMPUTE_CONFIG_MODELS
+from omf.bootstrap.catalog import COMPUTE_CONFIG_MODELS, STORAGE_CONFIG_MODELS
 from omf.bootstrap.config import load_config, parse_config
 from omf.core.domain.errors import ConfigurationError
 from tests.conftest import base_config
@@ -23,6 +23,7 @@ CONFIGS = Path(__file__).resolve().parents[2] / "configs"
         "production.example",
         "docker",
         "gpu-infrastructure.example",
+        "storage-backends.example",
     ],
 )
 def test_shipped_profiles_are_valid(profile: str) -> None:
@@ -37,6 +38,8 @@ def test_shipped_profiles_are_valid(profile: str) -> None:
     assert config.profile
     for environment in config.compute:  # adapter configs are only parsed at build time
         COMPUTE_CONFIG_MODELS[environment.adapter].model_validate(environment.config)
+    for store in config.storage:
+        STORAGE_CONFIG_MODELS[store.adapter].model_validate(store.config)
 
 
 def test_inline_secret_is_rejected(tmp_path: Path) -> None:

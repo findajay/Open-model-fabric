@@ -2,20 +2,37 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import io
 import os
-from collections.abc import AsyncIterator, Callable
+import uuid
+from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import format_datetime
 from pathlib import Path
 
+import httpx
 import pytest
 
+from omf.adapters.storage.azure_blob import (
+    API_VERSION,
+    AzureBlobConfig,
+    AzureBlobStorageAdapter,
+    shared_key_signature,
+    string_to_sign,
+)
 from omf.adapters.storage.google_drive import GoogleDriveConfig, GoogleDriveStorageAdapter
 from omf.adapters.storage.local_fs import LocalFilesystemConfig, LocalFilesystemStorageAdapter
 from omf.core.domain.errors import ArtifactNotFound, ChecksumMismatch, ValidationFailed
 from omf.core.domain.models import HealthStatus
+from omf.core.ports.secrets import SecretValue
 from omf.core.ports.storage import ArtifactStorageProvider
+from omf.core.security.egress import EgressPolicy
+from tests.contract.fake_azure_blob import ACCOUNT as FAKE_ACCOUNT
+from tests.contract.fake_azure_blob import CONTAINER as FAKE_CONTAINER
+from tests.contract.fake_azure_blob import FakeAzureBlob
 from tests.contract.fake_drive import FOLDER_ID, FakeDrive
 
 
@@ -29,10 +46,59 @@ async def _token() -> str:
     return "fake-token"
 
 
-@pytest.fixture(params=["local_fs", "google_drive", "s3"])
+AZURITE_URL = os.environ.get("OMF_TEST_AZURITE_URL")  # http://127.0.0.1:10000/devstoreaccount1
+# Azurite's publicly documented development account key (not a secret).
+AZURITE_KEY = os.environ.get(
+    "OMF_TEST_AZURITE_KEY",
+    "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==",
+)
+MINIO_URL = os.environ.get("OMF_TEST_MINIO_URL")  # http://127.0.0.1:9000
+
+
+@pytest.fixture(
+    params=[
+        "local_fs",
+        "google_drive",
+        "s3",
+        "azure_blob",
+        pytest.param(
+            "azure_blob_azurite",
+            marks=pytest.mark.skipif(not AZURITE_URL, reason="OMF_TEST_AZURITE_URL not set"),
+        ),
+        pytest.param(
+            "s3_minio",
+            marks=pytest.mark.skipif(not MINIO_URL, reason="OMF_TEST_MINIO_URL not set"),
+        ),
+    ]
+)
 async def backend(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[Backend]:
     kind = request.param
-    if kind == "local_fs":
+    if kind == "azure_blob":
+        fake = FakeAzureBlob()
+        adapter = AzureBlobStorageAdapter(
+            "azure",
+            AzureBlobConfig(
+                account_name=FAKE_ACCOUNT,
+                container=FAKE_CONTAINER,
+                endpoint_url=f"http://127.0.0.1:10000/{FAKE_ACCOUNT}",
+                account_key_ref="env:UNUSED",
+                block_size_mb=1,  # the large-file test then uses blocks + a block list
+            ),
+            EgressPolicy(allow_loopback=True),  # the fake transport answers; nothing connects
+            account_key=SecretValue(base64.b64encode(b"k" * 64).decode()),
+            transport=fake.transport(),
+        )
+        yield Backend(adapter, fake.corrupt)
+        await adapter.aclose()
+    elif kind == "azure_blob_azurite":
+        assert AZURITE_URL
+        async for b in _azurite_backend(AZURITE_URL):
+            yield b
+    elif kind == "s3_minio":
+        assert MINIO_URL
+        for b in _minio_backend(MINIO_URL):
+            yield b
+    elif kind == "local_fs":
         adapter = LocalFilesystemStorageAdapter(
             "local", LocalFilesystemConfig(root=str(tmp_path), keep_versions=2)
         )
@@ -74,6 +140,90 @@ async def backend(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterat
                 )
 
             yield Backend(adapter, corrupt)
+
+
+async def _azurite_backend(url: str) -> AsyncIterator[Backend]:
+    """A fresh container per test on a real Azurite, which validates Shared Key signatures."""
+    container = f"omf-{uuid.uuid4().hex[:12]}"
+    config = AzureBlobConfig(
+        account_name="devstoreaccount1",
+        container=container,
+        endpoint_url=url,
+        account_key_ref="env:UNUSED",
+        block_size_mb=1,
+    )
+    adapter = AzureBlobStorageAdapter(
+        "azurite",
+        config,
+        EgressPolicy(allow_loopback=True, allow_private_networks=True),
+        account_key=SecretValue(AZURITE_KEY),
+    )
+    created = await adapter._request("PUT", adapter._url(), params={"restype": "container"})
+    assert created.status_code == 201, created.text
+
+    def corrupt(key: str) -> None:
+        # Overwrite the bytes but keep the recorded checksum, as silent corruption would.
+        def signed(
+            method: str, target: str, headers: dict[str, str], body: bytes = b""
+        ) -> httpx.Response:
+            headers = {
+                "x-ms-version": API_VERSION,
+                "x-ms-date": format_datetime(datetime.now(UTC), usegmt=True),
+                "Content-Length": str(len(body)),
+                **headers,
+            }
+            sig = shared_key_signature(
+                AZURITE_KEY, string_to_sign("devstoreaccount1", method, target, headers)
+            )
+            headers["Authorization"] = f"SharedKey devstoreaccount1:{sig}"
+            return httpx.request(method, target, headers=headers, content=body or None)
+
+        target = adapter._url(key)
+        head = signed("HEAD", target, {})
+        meta = {k: v for k, v in head.headers.items() if k.lower().startswith("x-ms-meta-")}
+        put = signed("PUT", target, {"x-ms-blob-type": "BlockBlob", **meta}, b"tampered")
+        assert put.status_code == 201, put.text
+
+    yield Backend(adapter, corrupt)
+    await adapter._request("DELETE", adapter._url(), params={"restype": "container"})
+    await adapter.aclose()
+
+
+def _minio_backend(url: str) -> Iterator[Backend]:
+    """A fresh bucket per test on a real MinIO server, through the s3 adapter."""
+    import boto3
+
+    from omf.adapters.storage.s3 import S3Config, S3StorageAdapter
+
+    user = os.environ.get("OMF_TEST_MINIO_ACCESS_KEY", "omfminio")
+    password = os.environ.get("OMF_TEST_MINIO_SECRET_KEY", "omfminio-secret")
+    bucket = f"omf-{uuid.uuid4().hex[:12]}"
+    config = S3Config(
+        bucket=bucket, prefix="omf/", endpoint_url=url, region="us-east-1", force_path_style=True
+    )
+    adapter = S3StorageAdapter.from_config(
+        "minio", config, SecretValue(user), SecretValue(password)
+    )
+    client = boto3.client(
+        "s3",
+        endpoint_url=url,
+        region_name="us-east-1",
+        aws_access_key_id=user,
+        aws_secret_access_key=password,
+    )
+    client.create_bucket(Bucket=bucket)
+
+    def corrupt(key: str) -> None:
+        obj = client.get_object(Bucket=bucket, Key=f"omf/{key}")
+        client.put_object(
+            Bucket=bucket, Key=f"omf/{key}", Body=b"tampered", Metadata=obj["Metadata"]
+        )
+
+    yield Backend(adapter, corrupt)
+    for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket):
+        for obj in page.get("Contents", []):
+            client.delete_object(Bucket=bucket, Key=obj["Key"])
+    client.delete_bucket(Bucket=bucket)
 
 
 async def put_bytes(s: ArtifactStorageProvider, key: str, data: bytes, **kw: object):  # type: ignore[no-untyped-def]
