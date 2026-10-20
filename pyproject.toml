@@ -67,8 +67,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["python", "apps/api", "."]
+addopts = "-m 'not real_engine'"
 markers = [
   "postgres: requires a PostgreSQL server (OMF_TEST_POSTGRES_URL)",
+  "real_engine: runs against real inference engines; opt in with -m real_engine (see tests/real_engine)",
   "notebook: executes the Colab notebook in smoke mode (needs torch + transformers)",
 ]
 filterwarnings = [

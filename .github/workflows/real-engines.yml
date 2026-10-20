@@ -1,0 +1,127 @@
+name: Real engines
+
+# Runs tests/real_engine against real inference engines on CPU: Ollama (native API) and
+# llama.cpp llama-server (OpenAI-compatible API), with tiny models. Kept out of the main
+# CI workflow so pull requests stay fast; run it on demand and weekly.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: real-engines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ollama:
+    name: Ollama ${{ matrix.ollama }} (${{ matrix.chat }} + ${{ matrix.embed }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        ollama: ["0.40.0"]
+        chat: ["qwen2.5:0.5b"]
+        embed: ["all-minilm"]
+    env:
+      OMF_TEST_OLLAMA_URL: http://127.0.0.1:11434
+      OMF_TEST_OLLAMA_CHAT_MODEL: ${{ matrix.chat }}
+      OMF_TEST_OLLAMA_EMBED_MODEL: ${{ matrix.embed }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/ollama-models
+          key: ollama-models-${{ matrix.chat }}-${{ matrix.embed }}
+      - name: Start Ollama
+        run: |
+          mkdir -p ~/ollama-models
+          docker run -d --name ollama -p 11434:11434 \
+            -v ~/ollama-models:/root/.ollama/models ollama/ollama:${{ matrix.ollama }}
+          for i in $(seq 1 60); do curl -sf "$OMF_TEST_OLLAMA_URL/api/version" && break; sleep 1; done
+          curl -sf "$OMF_TEST_OLLAMA_URL/api/version"
+      - name: Pull models
+        run: |
+          docker exec ollama ollama pull "${{ matrix.chat }}"
+          docker exec ollama ollama pull "${{ matrix.embed }}"
+          docker exec ollama ollama list
+          # Files written by the container are root-owned; make them readable for the cache.
+          sudo chmod -R a+rX ~/ollama-models
+      - name: Warm up (load the models once)
+        run: |
+          curl -sf "$OMF_TEST_OLLAMA_URL/api/generate" \
+            -d '{"model":"${{ matrix.chat }}","prompt":"hi","stream":false,"options":{"num_predict":1}}' >/dev/null
+          curl -sf "$OMF_TEST_OLLAMA_URL/api/embed" \
+            -d '{"model":"${{ matrix.embed }}","input":"hi"}' >/dev/null
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - run: uv sync --frozen --all-extras --python 3.13
+      - run: uv run pytest -m real_engine -v -rs
+      - name: Engine logs
+        if: always()
+        run: docker logs ollama 2>&1 | tail -200
+
+  llamacpp:
+    name: llama.cpp ${{ matrix.image }} (OpenAI-compatible)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        image: ["server-b11515"]
+    env:
+      CHAT_REPO: Qwen/Qwen2.5-0.5B-Instruct-GGUF
+      CHAT_FILE: qwen2.5-0.5b-instruct-q4_k_m.gguf
+      EMBED_REPO: nomic-ai/nomic-embed-text-v1.5-GGUF
+      EMBED_FILE: nomic-embed-text-v1.5.Q4_K_M.gguf
+      OMF_TEST_LLAMACPP_URL: http://127.0.0.1:8080
+      OMF_TEST_LLAMACPP_EMBED_URL: http://127.0.0.1:8081
+      OMF_TEST_LLAMACPP_CHAT_MODEL: qwen2.5-0.5b-instruct
+      OMF_TEST_LLAMACPP_EMBED_MODEL: nomic-embed-text-v1.5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Model cache
+        uses: actions/cache@v4
+        with:
+          path: ~/gguf
+          key: gguf-${{ env.CHAT_FILE }}-${{ env.EMBED_FILE }}
+      - name: Download GGUF models from Hugging Face
+        run: |
+          mkdir -p ~/gguf
+          for pair in "$CHAT_REPO/$CHAT_FILE" "$EMBED_REPO/$EMBED_FILE"; do
+            file="${pair##*/}"; repo="${pair%/*}"
+            if [ ! -s ~/gguf/"$file" ]; then
+              curl -fL --retry 3 -o ~/gguf/"$file" "https://huggingface.co/$repo/resolve/main/$file"
+            fi
+            # A GGUF file starts with the magic bytes "GGUF".
+            test "$(head -c 4 ~/gguf/"$file")" = "GGUF"
+          done
+          ls -la ~/gguf
+      - name: Start llama-server (chat and embeddings)
+        run: |
+          image=ghcr.io/ggml-org/llama.cpp:${{ matrix.image }}
+          docker run -d --name llama-chat -p 8080:8080 -v ~/gguf:/models "$image" \
+            -m "/models/$CHAT_FILE" --alias "$OMF_TEST_LLAMACPP_CHAT_MODEL" \
+            --host 0.0.0.0 --port 8080 -c 4096 --parallel 1
+          docker run -d --name llama-embed -p 8081:8081 -v ~/gguf:/models "$image" \
+            -m "/models/$EMBED_FILE" --alias "$OMF_TEST_LLAMACPP_EMBED_MODEL" \
+            --host 0.0.0.0 --port 8081 --embeddings -c 2048 -b 2048 -ub 2048
+          for url in "$OMF_TEST_LLAMACPP_URL" "$OMF_TEST_LLAMACPP_EMBED_URL"; do
+            for i in $(seq 1 120); do curl -sf "$url/health" >/dev/null && break; sleep 1; done
+            curl -sf "$url/health"; echo
+          done
+          curl -sf "$OMF_TEST_LLAMACPP_URL/v1/models"; echo
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+      - run: uv sync --frozen --all-extras --python 3.13
+      - run: uv run pytest -m real_engine -v -rs
+      - name: Engine logs
+        if: always()
+        run: |
+          docker logs llama-chat 2>&1 | tail -150
+          docker logs llama-embed 2>&1 | tail -80
