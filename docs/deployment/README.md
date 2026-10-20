@@ -42,10 +42,16 @@ uses `configs/docker.yaml` by default, and stores SQLite plus local artifacts in
 
 ```bash
 cp .env.example .env              # set OMF_ADMIN_TOKEN
-make compose-up                   # API + UI on http://127.0.0.1:8080
+make compose-up                   # API + UI on http://127.0.0.1:8080 (OMF_PORT to change)
 make compose-up PROFILE=ollama    # + an Ollama container
-docker compose -f infrastructure/compose/docker-compose.yml exec ollama ollama pull qwen2.5:0.5b
+docker compose --env-file .env -f infrastructure/compose/docker-compose.yml exec ollama ollama pull qwen2.5:0.5b
 ```
+
+Run Compose from the repository root and pass `--env-file .env` when calling it directly
+(`make` does this for you): Compose otherwise reads `.env` from the compose file's
+directory, `infrastructure/compose/`, and fails with
+`required variable OMF_ADMIN_TOKEN is missing a value`. If host port 8080 is taken, set
+`OMF_PORT` in `.env`; the container still listens on 8080.
 
 To enable the Ollama provider in that stack, set `OMF_ENABLE_OLLAMA=true` in `.env`.
 GPU access for Ollama needs the NVIDIA Container Toolkit; the `deploy.resources` block
