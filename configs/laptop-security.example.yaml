@@ -1,0 +1,71 @@
+# Laptop test profile for authentication, SSO and rate limits (see
+# docs/getting-started/laptop-test-guide.md). Mock provider only; nothing leaves the laptop.
+#
+#   export OMF_ADMIN_TOKEN=admin-token-0123456789abcdef
+#   export OMF_USER_TOKEN=user-token-0123456789abcdef
+#   OMF_CONFIG=configs/laptop-security.example.yaml make dev-api
+profile: laptop-security
+environment: development
+
+server:
+  host: 127.0.0.1
+  port: 8080
+  cors_allow_origins: ["http://localhost:5173"]
+
+auth:
+  mode: api_key
+  token_reload_s: 5                     # rotate var/secrets/rotating_token and retry
+  tokens:
+    - name: admin
+      role: admin
+      token_ref: env:OMF_ADMIN_TOKEN
+    - name: app
+      role: user
+      token_ref: env:OMF_USER_TOKEN
+    - name: rotating
+      role: user
+      token_ref: file:var/secrets/rotating_token
+    - name: retired
+      role: user
+      token_ref: env:OMF_USER_TOKEN
+      expires_at: "2020-01-01T00:00:00Z"   # shows that expired entries never authenticate
+  # Keycloak from infrastructure/keycloak (see the guide). Remove this block if you do
+  # not run it: OIDC is only contacted when a JWT is presented.
+  oidc:
+    issuer: http://localhost:8180/realms/omf
+    audience: omf-api
+    role_claim: realm_access.roles
+    admin_values: [omf-admin]
+    user_values: [omf-user]
+
+security:
+  egress:
+    allow_loopback: true                # Keycloak and local engines run on localhost
+  secret_dirs: ["var/secrets"]
+  rate_limits:
+    requests_per_minute: 30
+    inference_per_minute: 5             # low on purpose: the 6th chat in a minute gets 429
+
+metadata:
+  url: sqlite:///./var/omf-laptop.db
+
+compute:
+  - id: local
+    adapter: local
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: ./var/artifacts
+
+providers:
+  - id: mock
+    adapter_type: mock
+    display_name: Mock provider
+    compute_environment_id: local
+
+inference:
+  default_provider: mock
+  default_model: mock-chat

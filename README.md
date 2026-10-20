@@ -38,7 +38,9 @@ make dev        # API http://127.0.0.1:8080 (docs at /docs) + UI http://localhos
 Then try `make demo` (the same request against mock → Ollama → OpenAI-compatible) and
 `make e2e` (the same thing in a real browser). See the
 [quickstart](docs/getting-started/quickstart.md) to connect real Ollama or vLLM
-servers.
+servers, and the [laptop test guide](docs/getting-started/laptop-test-guide.md) for a
+step-by-step check of every feature (tools, embeddings, audio, SSO, rate limits,
+multi-replica cancellation, storage and compute).
 
 ## Architecture in one picture
 

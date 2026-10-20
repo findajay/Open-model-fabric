@@ -206,7 +206,7 @@ export function DashboardPage() {
                   <TD className="text-xs">
                     {r.routing_policy ?? "—"}
                     {r.streaming ? " · stream" : ""}
-                    {r.operation === "embeddings" ? " · embeddings" : ""}
+                    {r.operation && r.operation !== "chat" ? ` · ${r.operation}` : ""}
                   </TD>
                   <TD>
                     <StatusBadge status={r.status} />

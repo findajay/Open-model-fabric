@@ -1,5 +1,7 @@
 # Quickstart
 
+To try every feature step by step, see the [laptop test guide](laptop-test-guide.md).
+
 Everything below runs on a laptop **without a GPU, model weights, network access or a
 cloud account**, using the mock inference provider. Real models are one configuration
 change away.

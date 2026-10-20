@@ -267,6 +267,26 @@ def test_api_key_rotation_without_restart_and_expiry(
     assert expired.status_code == 401 and "expired" in expired.json()["error"]["message"]
 
 
+def test_live_entry_wins_over_an_expired_entry_with_the_same_secret(
+    make_config: Callable[..., AppConfig], make_client: Callable[..., TestClient]
+) -> None:
+    # Found while testing configs/laptop-security.example.yaml: the expired entry used
+    # to shadow the live one, rejecting a valid key mid-rotation.
+    entry = {"role": "user", "token_ref": "env:OMF_T_SHARED"}
+    config = make_config(
+        auth={
+            "mode": "api_key",
+            "tokens": [
+                {"name": "live", **entry},
+                {"name": "old", **entry, "expires_at": "2020-01-01T00:00:00Z"},
+            ],
+        }
+    )
+    client = make_client(config, env={"OMF_T_SHARED": "shared-key-0123456789abcdef"})
+    response = client.get("/api/v1/system", headers=bearer("shared-key-0123456789abcdef"))
+    assert response.status_code == 200 and response.json()["data"]["principal"] == "live"
+
+
 # ---------------------------------------------------------------------- rate limits
 
 
