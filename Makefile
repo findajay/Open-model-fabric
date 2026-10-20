@@ -1,7 +1,9 @@
 # Open Model Fabric — developer tasks. Run `make help`.
 SHELL := /bin/bash
 PY := .venv/bin/python
-COMPOSE := docker compose -f infrastructure/compose/docker-compose.yml
+# Compose reads .env from the compose file's directory, not the repository root, so pass
+# the root .env explicitly (only when it exists: --env-file errors on a missing file).
+COMPOSE := docker compose $(if $(wildcard .env),--env-file .env) -f infrastructure/compose/docker-compose.yml
 
 .DEFAULT_GOAL := help
 .PHONY: help install dev dev-api dev-web demo test test-py test-postgres test-web e2e notebook-test \
