@@ -766,11 +766,31 @@
           },
           "role": {
             "$ref": "#/components/schemas/Role"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/ToolCall-Output"
+            },
+            "title": "Tool Calls",
+            "type": "array"
           }
         },
         "required": [
           "role",
           "content",
+          "tool_calls",
+          "tool_call_id",
           "id",
           "created_at",
           "metadata"
@@ -809,15 +829,37 @@
                 "type": "array"
               }
             ],
+            "default": "",
             "title": "Content"
           },
           "role": {
             "$ref": "#/components/schemas/Role"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Tool messages: the call being answered",
+            "title": "Tool Call Id"
+          },
+          "tool_calls": {
+            "description": "Assistant messages: tool calls returned by an earlier response",
+            "items": {
+              "$ref": "#/components/schemas/ToolCall-Input"
+            },
+            "maxItems": 64,
+            "title": "Tool Calls",
+            "type": "array"
           }
         },
         "required": [
-          "role",
-          "content"
+          "role"
         ],
         "title": "ChatMessageIn",
         "type": "object"
@@ -941,6 +983,21 @@
               }
             ],
             "title": "Temperature"
+          },
+          "tool_choice": {
+            "default": "auto",
+            "description": "'auto', 'none', 'required', or the name of one tool to force",
+            "title": "Tool Choice",
+            "type": "string"
+          },
+          "tools": {
+            "description": "Functions the model may ask the caller to run. OMF never runs them.",
+            "items": {
+              "$ref": "#/components/schemas/ToolDefinition"
+            },
+            "maxItems": 64,
+            "title": "Tools",
+            "type": "array"
           },
           "top_p": {
             "anyOf": [
@@ -2798,6 +2855,14 @@
           "timings": {
             "$ref": "#/components/schemas/Timings"
           },
+          "tool_calls": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ToolCall"
+            },
+            "title": "Tool Calls",
+            "type": "array"
+          },
           "usage": {
             "anyOf": [
               {
@@ -2815,7 +2880,8 @@
           "conversation_id",
           "finish_reason",
           "timings",
-          "usage"
+          "usage",
+          "tool_calls"
         ],
         "title": "MessageCompleted",
         "type": "object"
@@ -4046,7 +4112,8 @@
         "enum": [
           "system",
           "user",
-          "assistant"
+          "assistant",
+          "tool"
         ],
         "title": "Role",
         "type": "string"
@@ -4592,6 +4659,129 @@
           "source"
         ],
         "title": "TokenUsage",
+        "type": "object"
+      },
+      "ToolCall": {
+        "description": "A model's request to call a tool. ``arguments`` is the JSON text the model produced\n(it may be invalid JSON; callers must validate it before executing anything).",
+        "properties": {
+          "arguments": {
+            "default": "{}",
+            "maxLength": 200000,
+            "title": "Arguments",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "arguments"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
+      "ToolCall-Input": {
+        "description": "A model's request to call a tool. ``arguments`` is the JSON text the model produced\n(it may be invalid JSON; callers must validate it before executing anything).",
+        "properties": {
+          "arguments": {
+            "default": "{}",
+            "maxLength": 200000,
+            "title": "Arguments",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
+      "ToolCall-Output": {
+        "description": "A model's request to call a tool. ``arguments`` is the JSON text the model produced\n(it may be invalid JSON; callers must validate it before executing anything).",
+        "properties": {
+          "arguments": {
+            "default": "{}",
+            "maxLength": 200000,
+            "title": "Arguments",
+            "type": "string"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "arguments"
+        ],
+        "title": "ToolCall",
+        "type": "object"
+      },
+      "ToolDefinition": {
+        "additionalProperties": false,
+        "description": "A function the model may ask the *caller* to run. OMF never executes tools.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "description": "JSON Schema of the arguments; must describe an object",
+            "title": "Parameters",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ToolDefinition",
         "type": "object"
       },
       "UsageReported": {

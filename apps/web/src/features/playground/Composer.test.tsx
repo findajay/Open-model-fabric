@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { capabilitiesFor } from "@/pages/Playground";
 
-import { Composer } from "./Composer";
+import { Composer, EXAMPLE_TOOLS, parseTools } from "./Composer";
+import { pendingToolCalls } from "./useChat";
 
 function deployment(capabilities: string[], provider = "p", model = "m"): ModelDeployment {
   return {
@@ -65,15 +66,16 @@ describe("capability-driven composer (acceptance criterion 9)", () => {
     ).toEqual({
       vision: false,
       json: false,
+      tools: false,
     });
-    expect(capabilitiesFor([])).toEqual({ vision: false, json: false });
+    expect(capabilitiesFor([])).toEqual({ vision: false, json: false, tools: false });
   });
 
   it("sends text and attached images, and validates image type", async () => {
     const onSend = vi.fn();
     const { container } = render(
       <Composer
-        capabilities={{ vision: true, json: true }}
+        capabilities={{ vision: true, json: true, tools: false }}
         streaming={false}
         onSend={onSend}
         onCancel={() => {}}
@@ -102,7 +104,7 @@ describe("capability-driven composer (acceptance criterion 9)", () => {
     const onCancel = vi.fn();
     render(
       <Composer
-        capabilities={{ vision: false, json: false }}
+        capabilities={{ vision: false, json: false, tools: false }}
         streaming
         onSend={() => {}}
         onCancel={onCancel}
@@ -110,5 +112,51 @@ describe("capability-driven composer (acceptance criterion 9)", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /stop/i }));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("offers tools only for tool_calling models and validates the definitions", async () => {
+    const onSend = vi.fn();
+    const { rerender } = render(
+      <Composer
+        capabilities={{ vision: false, json: false, tools: false }}
+        streaming={false}
+        onSend={onSend}
+        onCancel={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("switch", { name: "Tools" })).not.toBeInTheDocument();
+    rerender(
+      <Composer
+        capabilities={{ vision: false, json: false, tools: true }}
+        streaming={false}
+        onSend={onSend}
+        onCancel={() => {}}
+      />,
+    );
+    await userEvent.click(screen.getByRole("switch", { name: "Tools" }));
+    const editor = screen.getByRole("textbox", { name: "Tool definitions (JSON)" });
+    await userEvent.type(screen.getByRole("textbox", { name: "Message" }), "weather?");
+    fireEvent.change(editor, { target: { value: "[not json" } });
+    expect(screen.getByText("Tools must be valid JSON")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send/i })).toBeDisabled();
+    fireEvent.change(editor, { target: { value: EXAMPLE_TOOLS } });
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    expect(onSend.mock.calls[0]?.[0].tools).toEqual(JSON.parse(EXAMPLE_TOOLS));
+  });
+
+  it("validates tool definitions", () => {
+    expect(parseTools("[]").error).toMatch(/non-empty/);
+    expect(parseTools('[{"description": "x"}]').error).toMatch(/name/);
+    expect(parseTools('[{"name": "a"}]')).toEqual({ tools: [{ name: "a" }], error: null });
+  });
+
+  it("finds unanswered tool calls only on a finished last assistant message", () => {
+    const call = { id: "c1", name: "get_weather", arguments: "{}" };
+    const assistant = { id: "a", role: "assistant" as const, text: "", toolCalls: [call] };
+    expect(pendingToolCalls([assistant])).toEqual([call]);
+    expect(pendingToolCalls([{ ...assistant, pending: true }])).toEqual([]);
+    expect(
+      pendingToolCalls([assistant, { id: "t", role: "tool", text: "18 C", toolCallId: "c1" }]),
+    ).toEqual([]);
   });
 });

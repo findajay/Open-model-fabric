@@ -22,7 +22,10 @@ tested, so benchmark runs record it.
 
 Notes:
 
-- `tool_calling` can be declared, but OMF's chat API has no tool-call request shape yet.
+- `tool_calling` deployments accept `tools` in chat requests ([API](../architecture/api.md#tool-calling)).
+  On OpenAI-compatible servers, declare it, and start the engine with tool parsing
+  enabled (vLLM: `--enable-auto-tool-choice --tool-call-parser <parser>`; llama.cpp:
+  `--jinja`). Ollama reports `tools` per model.
 - `embeddings` deployments are served by `POST /api/v1/embeddings`. An embeddings-only
   deployment is rejected for chat (`capability_not_supported`) and is not offered in the
   Playground.
@@ -58,8 +61,10 @@ The probe sends a non-streaming request ("Reply with the single word: OK",
 | Streaming request returns deltas | `streaming` |
 | JSON-mode response parses | `structured_output` |
 | Two texts return two equal-length vectors | `embeddings` |
+| A `get_weather` tool request returns a call with object arguments | `tool_calling` |
 
-Embedding-only models get no chat probe. Other claims (vision, tools) are reported as
+Embedding-only models get no chat probe. Small models often answer a tool request in
+text; that is recorded as `failed`, not `verified`. Other claims (vision) are reported as
 `not_probed` and keep their
 current evidence. Results are persisted and survive restarts. A new probe replaces the
 previous verified set for that deployment.

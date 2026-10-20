@@ -983,12 +983,29 @@ export interface components {
                 [key: string]: unknown;
             };
             role: components["schemas"]["Role"];
+            /** Tool Call Id */
+            tool_call_id: string | null;
+            /** Tool Calls */
+            tool_calls: components["schemas"]["ToolCall-Output"][];
         };
         /** ChatMessageIn */
         ChatMessageIn: {
-            /** Content */
-            content: string | (components["schemas"]["TextPart-Input"] | components["schemas"]["ImagePart-Input"])[];
+            /**
+             * Content
+             * @default
+             */
+            content?: string | (components["schemas"]["TextPart-Input"] | components["schemas"]["ImagePart-Input"])[];
             role: components["schemas"]["Role"];
+            /**
+             * Tool Call Id
+             * @description Tool messages: the call being answered
+             */
+            tool_call_id?: string | null;
+            /**
+             * Tool Calls
+             * @description Assistant messages: tool calls returned by an earlier response
+             */
+            tool_calls?: components["schemas"]["ToolCall-Input"][];
         };
         /** ChatRequest */
         ChatRequest: {
@@ -1026,6 +1043,17 @@ export interface components {
             stop?: string[] | null;
             /** Temperature */
             temperature?: number | null;
+            /**
+             * Tool Choice
+             * @description 'auto', 'none', 'required', or the name of one tool to force
+             * @default auto
+             */
+            tool_choice?: string;
+            /**
+             * Tools
+             * @description Functions the model may ask the caller to run. OMF never runs them.
+             */
+            tools?: components["schemas"]["ToolDefinition"][];
             /** Top P */
             top_p?: number | null;
         };
@@ -1613,6 +1641,11 @@ export interface components {
             /** Request Id */
             request_id: string;
             timings: components["schemas"]["Timings"];
+            /**
+             * Tool Calls
+             * @default []
+             */
+            tool_calls: components["schemas"]["ToolCall"][];
             usage: components["schemas"]["TokenUsage"] | null;
         };
         /** MessageDelta */
@@ -1973,7 +2006,7 @@ export interface components {
          * Role
          * @enum {string}
          */
-        Role: "system" | "user" | "assistant";
+        Role: "system" | "user" | "assistant" | "tool";
         /** RouteAttempt */
         RouteAttempt: {
             /** Error Code */
@@ -2183,6 +2216,71 @@ export interface components {
             source: "provider" | "estimated";
             /** Total Tokens */
             total_tokens: number | null;
+        };
+        /**
+         * ToolCall
+         * @description A model's request to call a tool. ``arguments`` is the JSON text the model produced
+         *     (it may be invalid JSON; callers must validate it before executing anything).
+         */
+        ToolCall: {
+            /**
+             * Arguments
+             * @default {}
+             */
+            arguments: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ToolCall
+         * @description A model's request to call a tool. ``arguments`` is the JSON text the model produced
+         *     (it may be invalid JSON; callers must validate it before executing anything).
+         */
+        "ToolCall-Input": {
+            /**
+             * Arguments
+             * @default {}
+             */
+            arguments?: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ToolCall
+         * @description A model's request to call a tool. ``arguments`` is the JSON text the model produced
+         *     (it may be invalid JSON; callers must validate it before executing anything).
+         */
+        "ToolCall-Output": {
+            /**
+             * Arguments
+             * @default {}
+             */
+            arguments: string;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ToolDefinition
+         * @description A function the model may ask the *caller* to run. OMF never executes tools.
+         */
+        ToolDefinition: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Parameters
+             * @description JSON Schema of the arguments; must describe an object
+             */
+            parameters?: {
+                [key: string]: unknown;
+            };
         };
         /** UsageReported */
         UsageReported: {

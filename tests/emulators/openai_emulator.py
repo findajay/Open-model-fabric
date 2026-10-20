@@ -24,6 +24,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
+from tests.emulators import _tools
 from tests.emulators._disconnect import until_disconnect
 from tests.emulators.ollama_emulator import fake_vector
 
@@ -59,6 +60,54 @@ def _text_of(content: Any) -> tuple[str, int]:
     text = "".join(p.get("text", "") for p in content if p.get("type") == "text")
     images = sum(1 for p in content if p.get("type") == "image_url")
     return text, images
+
+
+def _tool_call_response(
+    request: Request, body: dict[str, Any], model: str, name: str, arguments: dict[str, Any]
+) -> Response:
+    """A tool call in OpenAI format. Streaming sends the call the way vLLM does: id and
+    name first, then the JSON arguments in several fragments keyed by ``index``."""
+    call_id = f"call_{uuid.uuid4().hex[:12]}"
+    args = json.dumps(arguments)
+    usage = {"prompt_tokens": 10, "completion_tokens": len(args) // 4, "total_tokens": 0}
+    usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
+    base = {"id": f"chatcmpl-{uuid.uuid4().hex[:12]}", "created": int(time.time()), "model": model}
+    if not body.get("stream"):
+        message = {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {"id": call_id, "type": "function", "function": {"name": name, "arguments": args}}
+            ],
+        }
+        return JSONResponse(
+            {
+                **base,
+                "object": "chat.completion",
+                "choices": [{"index": 0, "finish_reason": "tool_calls", "message": message}],
+                "usage": usage,
+            }
+        )
+
+    def chunk(delta: dict[str, Any], finish: str | None = None) -> str:
+        choice = {"index": 0, "delta": delta, "finish_reason": finish}
+        payload = {**base, "object": "chat.completion.chunk", "choices": [choice]}
+        return f"data: {json.dumps(payload)}\n\n"
+
+    async def gen() -> Any:
+        first = {"index": 0, "id": call_id, "type": "function"}
+        yield chunk({"role": "assistant", "tool_calls": [{**first, "function": {"name": name}}]})
+        step = max(1, len(args) // 3)
+        for i in range(0, len(args), step):
+            fragment = {"index": 0, "function": {"arguments": args[i : i + step]}}
+            yield chunk({"tool_calls": [fragment]})
+        yield chunk({}, "tool_calls")
+        if (body.get("stream_options") or {}).get("include_usage"):
+            final = {**base, "object": "chat.completion.chunk", "choices": [], "usage": usage}
+            yield f"data: {json.dumps(final)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 def create_app(state: EmulatorState | None = None) -> Starlette:
@@ -102,9 +151,15 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
         model = body.get("model")
         if model not in MODELS:
             return _error(404, f"The model `{model}` does not exist.", "NotFoundError")
+        call = _tools.plan_call(body)
+        if call is not None:
+            return _tool_call_response(request, body, model, *call)
         last = next((m for m in reversed(body.get("messages", [])) if m.get("role") == "user"), {})
         prompt, images = _text_of(last.get("content", ""))
-        if body.get("response_format", {}).get("type") == "json_object":
+        tool_reply = _tools.result_text(body.get("messages", []), "OpenAI emulator")
+        if tool_reply is not None:
+            text = tool_reply
+        elif body.get("response_format", {}).get("type") == "json_object":
             text = json.dumps({"engine": "openai-emulator", "model": model, "echo": prompt[:100]})
         else:
             extra = f" ({images} image(s) attached)" if images else ""
@@ -120,7 +175,7 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
             "length" if body.get("max_tokens") and len(words) >= int(body["max_tokens"]) else "stop"
         )
         prompt_tokens = sum(
-            len(_text_of(m.get("content", ""))[0].split()) for m in body.get("messages", [])
+            len(_text_of(m.get("content") or "")[0].split()) for m in body.get("messages", [])
         )
         usage = {
             "prompt_tokens": prompt_tokens,

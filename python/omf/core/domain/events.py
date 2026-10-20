@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Any
 
 from omf.core.domain.base import DomainModel
-from omf.core.domain.models import RouteDecision, Timings, TokenUsage
+from omf.core.domain.models import RouteDecision, Timings, TokenUsage, ToolCall
 
 
 class StreamEventType(StrEnum):
@@ -51,6 +51,9 @@ class MessageCompleted(DomainModel):
     finish_reason: str | None
     timings: Timings
     usage: TokenUsage | None
+    tool_calls: list[ToolCall] = []
+    """Tool calls the model requested (``finish_reason == "tool_calls"``). Complete and
+    final: arguments are never streamed as fragments to clients."""
 
 
 class ErrorBody(DomainModel):

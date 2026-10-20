@@ -31,6 +31,7 @@ client of the API.
 | Sensitive prompts sent to third parties | `sensitivity: sensitive` requests are never routed to providers whose effective `allow_sensitive` is false. `openai_compatible` defaults to `external`, so sensitive prompts are refused until an operator marks it local. There is no silent cross-provider fallback. |
 | Prompt content in telemetry | `InferenceRecord`, metrics, spans and access logs carry ids, sizes and timings only. The access log omits query strings and bodies. |
 | Repudiation of configuration changes | Audit log (`audit_log` table, `omf.audit` logger): actor, action, target, request id and changed field names. Values are not logged. |
+| Model output triggering side effects (tool calls) | OMF never executes tools ([ADR-0013](../architecture/adr/0013-tool-calling-passthrough.md)). Tool calls are returned to the client as untrusted JSON text, and the client decides whether and how to run them. Tool definitions are bounded (64 per request, validated names, object schemas). |
 | Runaway cost from abandoned streams | Client disconnects cancel the upstream generation ([ADR-0005](../architecture/adr/0005-sse-streaming-and-cancellation.md)). Per-provider and global request timeouts apply. |
 
 ## Dependency scanning

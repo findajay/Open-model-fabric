@@ -30,7 +30,12 @@ from omf.core.domain.capabilities import (
     Evidence,
     Modality,
 )
-from omf.core.domain.errors import OMFError, ProviderError
+from omf.core.domain.errors import (
+    OMFError,
+    OperationNotSupported,
+    ProviderError,
+    ValidationFailed,
+)
 from omf.core.domain.models import (
     AuthRequirement,
     ChatMessage,
@@ -46,7 +51,9 @@ from omf.core.domain.models import (
     ProviderHealth,
     ProviderOperation,
     ResponseFormat,
+    Role,
     TokenUsage,
+    ToolCall,
     utcnow,
 )
 from omf.core.ports.inference import InferenceProvider
@@ -74,12 +81,51 @@ class OllamaConfig(BaseModel):
     """Call ``/api/show`` per model to learn capabilities and context length."""
 
 
-def _message(m: ChatMessage) -> dict[str, Any]:
+def _message(m: ChatMessage, request: InferenceRequest) -> dict[str, Any]:
     out: dict[str, Any] = {"role": m.role.value, "content": m.text()}
     images = m.images()
     if images:
         out["images"] = [img.data_base64 for img in images]
+    if m.tool_calls:
+        # Ollama takes arguments as an object and has no call ids.
+        out["tool_calls"] = [
+            {"function": {"name": c.name, "arguments": _arguments_object(c)}} for c in m.tool_calls
+        ]
+    if m.role == Role.TOOL:
+        # Ollama matches results to calls by tool name, not by id.
+        name = request.tool_name_for(m.tool_call_id or "")
+        if name:
+            out["tool_name"] = name
     return out
+
+
+def _arguments_object(call: ToolCall) -> dict[str, Any]:
+    try:
+        value = json.loads(call.arguments or "{}")
+    except ValueError:
+        value = None
+    if not isinstance(value, dict):
+        raise ValidationFailed(
+            f"tool call {call.id!r}: Ollama needs arguments that are a JSON object",
+            details={"tool_call_id": call.id},
+        )
+    return value
+
+
+def _tool_calls(message: dict[str, Any], request_id: str, offset: int) -> list[ToolCall]:
+    calls = []
+    for i, raw in enumerate(message.get("tool_calls") or [], start=offset):
+        function = raw.get("function") or {}
+        arguments = function.get("arguments")
+        calls.append(
+            ToolCall(
+                # Ollama does not assign ids; generate stable ones for this response.
+                id=str(raw.get("id") or f"call_{request_id}_{i}"),
+                name=str(function.get("name") or ""),
+                arguments=arguments if isinstance(arguments, str) else json.dumps(arguments or {}),
+            )
+        )
+    return calls
 
 
 def _usage(payload: dict[str, Any]) -> TokenUsage | None:
@@ -215,9 +261,27 @@ class OllamaInferenceAdapter(InferenceProvider):
         }
         body: dict[str, Any] = {
             "model": request.model,
-            "messages": [_message(m) for m in request.messages],
+            "messages": [_message(m, request) for m in request.messages],
             "stream": stream,
         }
+        if request.tools and request.tool_choice != "none":
+            if request.tool_choice != "auto":
+                raise OperationNotSupported(
+                    f"Ollama does not support tool_choice={request.tool_choice!r}; "
+                    "use 'auto' or 'none'",
+                    details={"provider_id": self.provider_id, "tool_choice": request.tool_choice},
+                )
+            body["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        **({"description": t.description} if t.description else {}),
+                        "parameters": t.parameters,
+                    },
+                }
+                for t in request.tools
+            ]
         if options:
             body["options"] = options
         if p.response_format == ResponseFormat.JSON:
@@ -230,9 +294,18 @@ class OllamaInferenceAdapter(InferenceProvider):
         payload = await self._get_json("POST", "/api/chat", self._body(request, stream=False))
         if "error" in payload:
             raise ProviderError(f"provider {self.provider_id!r}: {str(payload['error'])[:300]}")
+        message = payload.get("message") or {}
+        try:
+            calls = _tool_calls(message, request.request_id, 0)
+        except ValueError as exc:
+            raise ProviderError(
+                f"provider {self.provider_id!r} returned a malformed tool call"
+            ) from exc
         return GenerationResult(
-            content=(payload.get("message") or {}).get("content", ""),
-            finish_reason=payload.get("done_reason") or "stop",
+            content=message.get("content", ""),
+            tool_calls=calls,
+            # Ollama reports "stop" even when the model called tools.
+            finish_reason="tool_calls" if calls else payload.get("done_reason") or "stop",
             usage=_usage(payload),
         )
 
@@ -241,6 +314,7 @@ class OllamaInferenceAdapter(InferenceProvider):
     ) -> AsyncGenerator[GenerationChunk, None]:
         await self._http.ensure_egress()
         final: dict[str, Any] | None = None
+        calls: list[ToolCall] = []
         try:
             async with self._http.client.stream(
                 "POST", "/api/chat", json=self._body(request, stream=True)
@@ -266,6 +340,14 @@ class OllamaInferenceAdapter(InferenceProvider):
                     delta = (event.get("message") or {}).get("content")
                     if delta:
                         yield GenerationChunk(delta=delta)
+                    try:
+                        calls += _tool_calls(
+                            event.get("message") or {}, request.request_id, len(calls)
+                        )
+                    except ValueError as exc:
+                        raise ProviderError(
+                            f"provider {self.provider_id!r} streamed a malformed tool call"
+                        ) from exc
                     if event.get("done"):
                         final = event
                         break
@@ -277,7 +359,12 @@ class OllamaInferenceAdapter(InferenceProvider):
             raise ProviderError(
                 f"provider {self.provider_id!r} closed the stream before completion"
             )
-        yield GenerationChunk(finish_reason=final.get("done_reason") or "stop", usage=_usage(final))
+        if calls:
+            yield GenerationChunk(tool_calls=calls)
+        yield GenerationChunk(
+            finish_reason="tool_calls" if calls else final.get("done_reason") or "stop",
+            usage=_usage(final),
+        )
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResult:
         body: dict[str, Any] = {"model": request.model, "input": request.inputs}

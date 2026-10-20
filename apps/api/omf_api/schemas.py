@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Generic, Literal, TypeVar
 
-from pydantic import ConfigDict, Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from omf.core.domain.base import DomainModel
 from omf.core.domain.capabilities import Capability
@@ -24,6 +24,8 @@ from omf.core.domain.models import (
     Role,
     Sensitivity,
     Timeouts,
+    ToolCall,
+    ToolDefinition,
 )
 from omf.core.ports.secrets import SecretReferenceInfo
 from omf_api.context import current_request_id
@@ -54,7 +56,27 @@ class ChatMessageIn(DomainModel):
     content: (
         Annotated[str, Field(max_length=200_000)]
         | Annotated[list[ContentPart], Field(max_length=64)]
+    ) = ""
+    tool_calls: list[ToolCall] = Field(
+        default_factory=list,
+        max_length=64,
+        description="Assistant messages: tool calls returned by an earlier response",
     )
+    tool_call_id: str | None = Field(
+        default=None, max_length=128, description="Tool messages: the call being answered"
+    )
+
+    @model_validator(mode="after")
+    def _roles(self) -> ChatMessageIn:
+        if self.tool_calls and self.role != Role.ASSISTANT:
+            raise ValueError("only assistant messages can carry tool_calls")
+        if self.role == Role.TOOL and not self.tool_call_id:
+            raise ValueError("tool messages need tool_call_id")
+        if self.tool_call_id and self.role != Role.TOOL:
+            raise ValueError("only tool messages can carry tool_call_id")
+        if self.role == Role.TOOL and not isinstance(self.content, str):
+            raise ValueError("tool message content must be a string")
+        return self
 
 
 class ChatRequest(DomainModel):
@@ -77,6 +99,36 @@ class ChatRequest(DomainModel):
     response_format: ResponseFormat = ResponseFormat.TEXT
     sensitivity: Sensitivity = Sensitivity.NORMAL
     required_capabilities: list[Capability] = Field(default_factory=list)
+    tools: list[ToolDefinition] = Field(
+        default_factory=list,
+        max_length=64,
+        description="Functions the model may ask the caller to run. OMF never runs them.",
+    )
+    tool_choice: str = Field(
+        default="auto",
+        description="'auto', 'none', 'required', or the name of one tool to force",
+    )
+
+    @model_validator(mode="after")
+    def _tools(self) -> ChatRequest:
+        names = [t.name for t in self.tools]
+        if len(set(names)) != len(names):
+            raise ValueError("tool names must be unique")
+        if self.tool_choice not in ("auto", "none", "required", *names):
+            raise ValueError(f"tool_choice {self.tool_choice!r} is not one of the tools")
+        if self.tool_choice == "required" and not self.tools:
+            raise ValueError("tool_choice 'required' needs tools")
+        if self.conversation_id is None:
+            # Within a self-contained request, every tool result must answer a call
+            # that an earlier assistant message made.
+            seen: set[str] = set()
+            for m in self.messages:
+                seen.update(c.id for c in m.tool_calls)
+                if m.role == Role.TOOL and m.tool_call_id not in seen:
+                    raise ValueError(
+                        f"tool message answers unknown tool_call_id {m.tool_call_id!r}"
+                    )
+        return self
 
     def params(self) -> GenerationParams:
         return GenerationParams(
@@ -89,7 +141,15 @@ class ChatRequest(DomainModel):
         )
 
     def domain_messages(self) -> list[ChatMessage]:
-        return [ChatMessage(role=m.role, content=m.content) for m in self.messages]
+        return [
+            ChatMessage(
+                role=m.role,
+                content=m.content,
+                tool_calls=m.tool_calls,
+                tool_call_id=m.tool_call_id,
+            )
+            for m in self.messages
+        ]
 
 
 class EmbeddingsRequest(DomainModel):
