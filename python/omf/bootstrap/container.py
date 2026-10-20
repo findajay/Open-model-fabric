@@ -142,10 +142,12 @@ class Container:
     extras: dict[str, Any] = field(default_factory=dict)
 
     async def start(self, *, background: bool = True) -> None:
+        self.inference.start()  # shared-cancellation poller (essential, not optional)
         if background:
             self.health.start()
 
     async def aclose(self) -> None:
+        await self.inference.aclose()
         await self.benchmarks.shutdown()
         await self.health.stop()
         await self.providers.aclose()
@@ -268,6 +270,8 @@ async def build_container(
         telemetry,
         log_prompt_content=config.security.log_prompt_content,
     )
+    if config.server.cancellation == "shared":
+        inference.enable_shared_cancellation(metadata)
     benchmarks = BenchmarkService(metadata, inference, providers, models, compute)
     audit = AuditService(metadata)
     return Container(

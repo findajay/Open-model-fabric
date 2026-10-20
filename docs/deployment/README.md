@@ -78,9 +78,10 @@ Run database migrations as a separate step if you prefer:
 `python -m omf.bootstrap.migrate`. The API also migrates on start.
 
 **Scaling.** SQLite is single-writer, so run one replica unless the metadata store is
-PostgreSQL. In-flight request cancellation is tracked per process, so an explicit
-`POST /chat/requests/{id}/cancel` must reach the replica serving the stream (use sticky
-sessions); closing the client connection always works.
+PostgreSQL. With several replicas, set `server.cancellation: shared`: in-flight requests
+are registered in the database, and `POST /chat/requests/{id}/cancel` reaches the replica
+serving the stream within about 0.5 s, so sticky sessions are not needed. Closing the
+client connection always works. Rate limits are per replica (see the threat model).
 
 ## Dedicated GPU inference
 
@@ -130,7 +131,8 @@ OMF is one stateless container plus a database, so any container platform can ho
 This has **not been tested**. The requirements are the same as for Kubernetes:
 
 - use PostgreSQL and S3 (or another shared store) when you run more than one task;
-- route a stream's cancel request to the same task (sticky sessions);
+- set `server.cancellation: shared` (or route a stream's cancel request to the same task
+  with sticky sessions);
 - raise the load balancer's idle timeout above your longest stream (AWS ALB defaults to
   60 s).
 

@@ -75,7 +75,11 @@ def _llamacpp() -> Engine | None:
         "timeouts": TIMEOUTS,
         "config": {"base_url": f"{chat_url.rstrip('/')}/v1"},
         "models": [
-            {"name": chat_model, "capabilities": ["chat", "text_generation", "structured_output"]}
+            {
+                "name": chat_model,
+                # llama-server needs --jinja for tool calls (see the workflow).
+                "capabilities": ["chat", "text_generation", "structured_output", "tool_calling"],
+            }
         ],
     }
     embed = {

@@ -148,3 +148,23 @@ async def test_migration_0002_upgrades_an_existing_0001_database(tmp_path: Path)
     old = await store.get_conversation("c1")
     assert old is not None and old.owner is None
     await store.aclose()
+
+
+async def test_request_coordination(store: SqlMetadataStore) -> None:
+    await store.register_inflight("r1", "alice", "replica-a")
+    await store.register_inflight("r2", None, "replica-b")
+    assert await store.inflight_owner("r1") == (True, "alice")
+    assert await store.inflight_owner("r2") == (True, None)
+    assert await store.inflight_owner("nope") == (False, None)
+    assert sorted(await store.list_inflight()) == ["r1", "r2"]
+    assert await store.list_inflight("alice") == ["r1"]
+    await store.request_cancel("r1")
+    await store.request_cancel("r1")  # idempotent
+    assert await store.take_cancels(["r2"]) == []
+    assert await store.take_cancels(["r1", "r2"]) == ["r1"]
+    assert await store.take_cancels(["r1"]) == []  # consumed
+    await store.unregister_inflight("r1")
+    assert await store.list_inflight() == ["r2"]
+    assert await store.prune_inflight(3600) == 0
+    assert await store.prune_inflight(-1) == 1  # everything is older than "the future"
+    assert await store.list_inflight() == []

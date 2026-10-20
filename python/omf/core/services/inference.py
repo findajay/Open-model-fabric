@@ -67,7 +67,11 @@ from omf.core.domain.models import (
     new_id,
     utcnow,
 )
-from omf.core.ports.metadata import ConversationRepository, InferenceRecordRepository
+from omf.core.ports.metadata import (
+    ConversationRepository,
+    InferenceRecordRepository,
+    RequestCoordinationRepository,
+)
 from omf.core.ports.telemetry import TelemetryProvider
 from omf.core.services.health import HealthMonitor
 from omf.core.services.provider_registry import ProviderRegistry
@@ -145,6 +149,53 @@ class InferenceService:
         self._inflight: dict[str, tuple[asyncio.Task[Any], list[str]]] = {}
         self._owners: dict[str, str | None] = {}
         self._background: set[asyncio.Task[None]] = set()
+        self._coordinator: RequestCoordinationRepository | None = None
+        self._replica = new_id("replica")
+        self._poller: asyncio.Task[None] | None = None
+
+    # ================================================================ coordination
+
+    def enable_shared_cancellation(self, coordinator: RequestCoordinationRepository) -> None:
+        """Record in-flight requests in shared storage so cancels reach any replica."""
+        self._coordinator = coordinator
+
+    def start(self, *, poll_s: float = 0.5) -> None:
+        if self._coordinator is not None and self._poller is None:
+            self._poller = asyncio.create_task(self._poll_cancels(poll_s))
+
+    async def aclose(self) -> None:
+        if self._poller is not None:
+            self._poller.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._poller
+            self._poller = None
+
+    async def _poll_cancels(self, poll_s: float) -> None:
+        assert self._coordinator is not None
+        last_prune = 0.0
+        while True:
+            await asyncio.sleep(poll_s)
+            try:
+                for request_id in await self._coordinator.take_cancels(list(self._inflight)):
+                    await self.cancel(request_id)  # authorised when the cancel was recorded
+                if time.monotonic() - last_prune > 300:
+                    stale_after = max(3600.0, 2 * self._settings.current.request_timeout_s)
+                    await self._coordinator.prune_inflight(stale_after)
+                    last_prune = time.monotonic()
+            except OMFError as exc:
+                log.warning("cancellation poll failed: %s", exc.message)
+
+    async def _register(self, cmd: ChatCommand) -> None:
+        if self._coordinator is not None:
+            try:
+                await self._coordinator.register_inflight(cmd.request_id, cmd.owner, self._replica)
+            except OMFError as exc:  # cancellation degrades to local; the request proceeds
+                log.warning("could not register request %s: %s", cmd.request_id, exc.message)
+
+    async def _unregister(self, request_id: str) -> None:
+        if self._coordinator is not None:
+            with contextlib.suppress(OMFError):
+                await self._coordinator.unregister_inflight(request_id)
 
     # ================================================================ public API
 
@@ -153,6 +204,7 @@ class InferenceService:
         self._inflight[cmd.request_id] = (task, [])
         self._owners[cmd.request_id] = cmd.owner
         try:
+            await self._register(cmd)
             return await task
         except asyncio.CancelledError:
             if task.cancelled() and not _current_task_cancelling():
@@ -164,6 +216,7 @@ class InferenceService:
         finally:
             self._inflight.pop(cmd.request_id, None)
             self._owners.pop(cmd.request_id, None)
+            await self._unregister(cmd.request_id)
 
     async def stream(self, cmd: ChatCommand) -> AsyncGenerator[StreamEvent, None]:
         """Yield normalised events. Closing the iterator cancels the request."""
@@ -173,6 +226,7 @@ class InferenceService:
         self._owners[cmd.request_id] = cmd.owner
         finished = False
         try:
+            await self._register(cmd)
             while True:
                 item = await queue.get()
                 if item is None:
@@ -197,6 +251,8 @@ class InferenceService:
                     await asyncio.shield(task)
             self._inflight.pop(cmd.request_id, None)
             self._owners.pop(cmd.request_id, None)
+            with contextlib.suppress(asyncio.CancelledError):
+                await asyncio.shield(self._unregister(cmd.request_id))
 
     async def preflight(self, cmd: ChatCommand, *, streaming: bool) -> RoutePlan:
         """Validate and route without side effects, so that streaming endpoints can return a
@@ -354,8 +410,18 @@ class InferenceService:
     async def cancel(
         self, request_id: str, *, owner: str | None = None, is_admin: bool = True
     ) -> bool:
-        """Cancel an in-flight request. Non-admin callers can only cancel their own."""
+        """Cancel an in-flight request. Non-admin callers can only cancel their own.
+
+        With shared cancellation, a request served by another replica is cancelled by
+        recording a cancel request that its replica picks up within ``poll_s``.
+        """
         entry = self._inflight.get(request_id)
+        if entry is None and self._coordinator is not None:
+            found, request_owner = await self._coordinator.inflight_owner(request_id)
+            if not found or (not is_admin and request_owner != owner):
+                return False
+            await self._coordinator.request_cancel(request_id)
+            return True
         if entry is None or (not is_admin and self._owners.get(request_id) != owner):
             return False
         task, provider_ids = entry
@@ -366,8 +432,12 @@ class InferenceService:
         _cancel_once(task)
         return True
 
-    def inflight(self, *, owner: str | None = None, is_admin: bool = True) -> list[str]:
-        return [r for r in self._inflight if is_admin or self._owners.get(r) == owner]
+    async def inflight(self, *, owner: str | None = None, is_admin: bool = True) -> list[str]:
+        local = [r for r in self._inflight if is_admin or self._owners.get(r) == owner]
+        if self._coordinator is None:
+            return local
+        shared = await self._coordinator.list_inflight(None if is_admin else owner)
+        return sorted(set(local) | set(shared))
 
     # ================================================================ preparation
 

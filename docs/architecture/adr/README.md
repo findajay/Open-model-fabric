@@ -15,6 +15,7 @@
 | [0011](0011-benchmark-comparability.md) | Benchmarks record environment and flag incomparable results | Accepted |
 | [0012](0012-managed-compute-lifecycle.md) | Managed compute lifecycle is opt-in and ownership-bound | Accepted |
 | [0013](0013-tool-calling-passthrough.md) | Tool calling is passthrough; OMF never executes tools | Accepted |
+| [0014](0014-sso-rotation-rate-limits.md) | SSO by OIDC token validation, rotatable keys, in-process rate limits, shared cancellation | Accepted |
 
 Format: Status · Context · Decision · Consequences · Alternatives considered.
 New ADRs take the next number. Superseded ADRs stay in the index and are marked as such.

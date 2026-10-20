@@ -37,6 +37,12 @@ unauthenticated.
 
 **Limits.** The request body limit is `server.max_request_bytes` (default 10 MiB). Artifact
 uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_large`.
+- **Authentication:** `Authorization: Bearer <token>`, with either an API key or, when
+  `auth.oidc` is configured, an OIDC JWT. Principals from OIDC are named
+  `sso:<preferred_username>`.
+- **Rate limits:** when `security.rate_limits` is set, exceeding a limit returns 429
+  `rate_limited` with a `Retry-After` header and `details.limit` (`requests` or
+  `inference`).
 
 ## Endpoints
 
@@ -65,7 +71,7 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
 | `POST /api/v1/chat/stream` | user | `ChatRequest` → `text/event-stream` |
 | `POST /api/v1/chat/requests/{request_id}/cancel` | user | `{request_id, cancelled}` |
 | `POST /api/v1/embeddings` | user | `EmbeddingsRequest` → `EmbeddingResponse` (see below) |
-| `GET /api/v1/chat/requests` | user | Ids of in-flight requests |
+| `GET /api/v1/chat/requests` | user | Ids of in-flight requests (all replicas with `server.cancellation: shared`) |
 | `GET/POST /api/v1/conversations` | user | List the caller's conversations (`limit` ≤ 200; admins: `all_users=true`) / create |
 | `GET/PATCH/DELETE /api/v1/conversations/{id}` | user (owner) or admin | Get with messages / rename / delete; 404 for other users' conversations |
 | `GET /api/v1/compute?refresh=` | user | Compute environments (cached until `refresh=true`) |

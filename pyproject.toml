@@ -30,6 +30,8 @@ dependencies = [
 gdrive = ["google-auth==2.62.0", "requests==2.34.2"]
 # S3-compatible artifact storage (AWS S3, MinIO, ...).
 s3 = ["boto3==1.43.115"]
+# OIDC (SSO) bearer-token validation: JWT signatures against the issuer's JWKS.
+oidc = ["pyjwt[crypto]==2.15.1"]
 # PostgreSQL metadata repository.
 postgres = ["psycopg[binary]==3.3.6"]
 # Optional OpenTelemetry exporter.

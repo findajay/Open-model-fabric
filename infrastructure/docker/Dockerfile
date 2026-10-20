@@ -23,10 +23,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
 COPY pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --no-install-project --extra postgres --extra s3 --extra gdrive --extra otel
+RUN uv sync --frozen --no-dev --no-install-project --extra postgres --extra s3 --extra gdrive --extra otel --extra oidc
 COPY python/ python/
 COPY apps/api/ apps/api/
-RUN uv sync --frozen --no-dev --no-editable --extra postgres --extra s3 --extra gdrive --extra otel
+RUN uv sync --frozen --no-dev --no-editable --extra postgres --extra s3 --extra gdrive --extra otel --extra oidc
 
 # ---------------------------------------------------------------- runtime
 FROM python:3.13.16-slim AS runtime
