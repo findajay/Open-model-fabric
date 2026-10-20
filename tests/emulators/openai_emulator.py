@@ -24,7 +24,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
-from tests.emulators import _tools
+from tests.emulators import _audio, _tools
 from tests.emulators._disconnect import until_disconnect
 from tests.emulators.ollama_emulator import fake_vector
 
@@ -136,7 +136,11 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
                         "owned_by": "emulator",
                         **meta,
                     }
-                    for name, meta in {**MODELS, **EMBEDDING_MODELS}.items()
+                    for name, meta in {
+                        **MODELS,
+                        **EMBEDDING_MODELS,
+                        **{m: {} for m in _audio.TRANSCRIPTION_MODELS | _audio.SPEECH_MODELS},
+                    }.items()
                 ],
             }
         )
@@ -277,11 +281,23 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
             }
         )
 
+    async def audio_transcriptions(request: Request) -> Response:
+        if (denied := check_auth(request)) is not None:
+            return denied
+        return await _audio.transcriptions(request, st)
+
+    async def audio_speech(request: Request) -> Response:
+        if (denied := check_auth(request)) is not None:
+            return denied
+        return await _audio.speech(request, st)
+
     app = Starlette(
         routes=[
             Route("/v1/models", models),
             Route("/v1/chat/completions", completions, methods=["POST"]),
             Route("/v1/embeddings", embeddings, methods=["POST"]),
+            Route("/v1/audio/transcriptions", audio_transcriptions, methods=["POST"]),
+            Route("/v1/audio/speech", audio_speech, methods=["POST"]),
         ]
     )
     app.state.emulator = st

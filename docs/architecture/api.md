@@ -65,6 +65,8 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
 | `POST /api/v1/chat/stream` | user | `ChatRequest` → `text/event-stream` |
 | `POST /api/v1/chat/requests/{request_id}/cancel` | user | `{request_id, cancelled}` |
 | `POST /api/v1/embeddings` | user | `EmbeddingsRequest` → `EmbeddingResponse` (see below) |
+| `POST /api/v1/audio/transcriptions` | user | Multipart `file` (+ `model`, `provider_id`, `language`, `prompt`, `sensitivity`) → `TranscriptionResponse` |
+| `POST /api/v1/audio/speech` | user | `SpeechBody` → audio bytes (`audio/wav`, `audio/mpeg`, `audio/ogg`, `audio/flac`); errors are JSON |
 | `GET /api/v1/chat/requests` | user | Ids of in-flight requests |
 | `GET/POST /api/v1/conversations` | user | List the caller's conversations (`limit` ≤ 200; admins: `all_users=true`) / create |
 | `GET/PATCH/DELETE /api/v1/conversations/{id}` | user (owner) or admin | Get with messages / rename / delete; 404 for other users' conversations |
@@ -87,7 +89,7 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
 | `GET /api/v1/settings` | user | `{runtime, read_only}` |
 | `PATCH /api/v1/settings` | admin | Validated (unknown keys and `routing.mode: explicit` are rejected), persisted, audited |
 | `GET /api/v1/requests/recent?limit=` | user | `InferenceRecord[]` (no prompt content) |
-| `GET /api/v1/metrics/summary?window=&operation=chat\|embeddings` | user | Per-provider count, error rate, p50/p95 latency, mean TTFT, tokens/s, for one operation (default `chat`) |
+| `GET /api/v1/metrics/summary?window=&operation=chat\|embeddings\|transcription\|speech` | user | Per-provider count, error rate, p50/p95 latency, mean TTFT, tokens/s, for one operation (default `chat`) |
 | `GET /api/v1/metrics/telemetry` | user | In-process telemetry aggregates |
 | `GET /api/v1/audit` | admin | |
 | `GET /api/v1/secrets` | admin | Secret references from the profile and from all providers, with availability. Never values. |
@@ -186,6 +188,47 @@ model is never used for embeddings. Adapters:
 
 On OpenAI-compatible servers, declare the model as `capabilities: [embeddings]`, because
 `/v1/models` cannot say which models embed.
+
+### Audio (speech-to-text and text-to-speech)
+
+Transcription routes on `audio_input`. It is a multipart upload:
+
+```shell
+curl -F file=@clip.wav -F language=en http://localhost:8080/api/v1/audio/transcriptions
+# -> {"data": {"text": "...", "language": "en", "duration_s": 3.2, "model": "...", "route": {...}}}
+```
+
+Upload rules:
+
+- Accepted content types: wav, mp3, m4a/mp4, ogg, webm and flac. Codec parameters such
+  as `;codecs=opus` are ignored.
+- The file's magic bytes must match the declared type. A mislabeled file returns 422
+  and is never forwarded to the engine.
+- Files are capped at 25 MB. The server-wide `max_request_bytes` (10 MB by default)
+  applies first; raise it for longer recordings.
+- `language` is an ISO-639-1 code.
+
+Speech routes on `audio_output`. It takes `{input (≤4096 chars), voice, format:
+wav|mp3|opus|flac (default wav), speed 0.25-4, model, provider_id}` and returns the
+audio bytes. The `X-OMF-Provider` and `X-OMF-Model` headers name the route.
+
+Adapters:
+
+- `mock`:
+  - `mock-whisper` describes the upload (byte count, hash, and WAV duration); it does
+    not recognise speech.
+  - `mock-tts` returns a WAV tone; only `wav` is supported.
+- `openai_compatible`:
+  - `POST /audio/transcriptions` (multipart: `file`, `model`, `response_format`,
+    `language`, `prompt`).
+  - `POST /audio/speech` (`model`, `input`, `voice`, `response_format`, `speed`).
+  - Field names follow the OpenAI API specification.
+  - Set `transcription_format: verbose_json` to also get `language` and `duration`
+    from Whisper servers; `gpt-4o-transcribe` only accepts `json`.
+  - Servers that speak this protocol include whisper.cpp `whisper-server`, speaches
+    (faster-whisper), vLLM with Whisper, Kokoro-FastAPI and OpenAI. Declare
+    `audio_input` or `audio_output` on the model.
+- `ollama`: Ollama has no transcription or speech API, so OMF returns 501.
 
 
 ## Server-Sent Events contract

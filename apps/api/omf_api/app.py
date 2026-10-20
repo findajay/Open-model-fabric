@@ -21,6 +21,7 @@ from omf_api.context import RequestIdLogFilter
 from omf_api.errors import ErrorResponse, install_error_handlers
 from omf_api.middleware import RequestContextMiddleware
 from omf_api.routers import (
+    audio,
     benchmarks,
     chat,
     conversations,
@@ -111,6 +112,7 @@ def create_app(
         models,
         chat,
         embeddings,
+        audio,
         conversations,
         infrastructure,
         benchmarks,
