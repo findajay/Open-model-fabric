@@ -194,10 +194,48 @@ Dependabot keeps them current, and you can pin SHAs for stricter supply-chain co
 Both fixes were mutation-checked: reverting either one makes these tests fail. No real
 embedding model was run.
 
+## Phase 8 — Tool calling
+
+**Implemented.**
+* Requests accept `tools` and `tool_choice`. Responses return `tool_calls` with
+  `finish_reason: tool_calls`. `tool` messages return results.
+* Requests that use tools are routed on the `tool_calling` capability.
+* In streams, tool calls are complete in `message.completed`.
+* Tool calls and results are persisted in conversations.
+* A verification probe for `tool_calling`.
+* A Playground tool editor and tool-result form; the user runs the tools.
+* Adapters: mock (deterministic calls from the schema), Ollama (generated ids, object
+  arguments, `tool_name`, `done_reason` normalisation; `tool_choice` beyond
+  `auto`/`none` returns 501) and OpenAI-compatible (fragment reassembly, with or without
+  `index`).
+* OMF never executes tools (ADR-0013).
+
+**Wire formats.** The Ollama formats were checked against Ollama's current `docs/api.md`.
+The OpenAI format follows the Chat Completions specification.
+
+**Found while building it.**
+* The mock's non-streaming path dropped tool calls; streaming worked.
+* The OpenAI emulator crashed on `content: null` in assistant tool-call messages, which
+  is valid OpenAI format.
+* The `api.md` embeddings section had been inserted into the middle of the chat-request
+  section; it has been moved.
+
+**Tests.**
+* `tests/integration/test_tools.py` (15 tests): validation, routing, the mock loop,
+  persistence and the verify probe, and the Ollama and OpenAI wire formats against the
+  emulators, including fragment reassembly and malformed calls.
+* Web unit tests for the composer.
+* A Playwright test of the full browser loop.
+
+Two adapter behaviours were mutation-checked: OpenAI fragment reassembly and the Ollama
+`tool_name` mapping. Breaking either one makes these tests fail. Real models were not run
+here. The real-engine CI work runs separately.
+
 ## Remaining work (not implemented)
 
-* Tool-calling request/response passthrough, and audio input and output. These
-  capabilities exist in the vocabulary, the catalog and the UI badges only.
+* Audio input and output. These capabilities exist in the vocabulary, the catalog and
+  the UI badges only.
+* Server-side tool execution. This is deliberately out of scope; see ADR-0013.
 * A UI for embeddings: the endpoint and SDK exist, but no screen calls them.
 * Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
   provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters

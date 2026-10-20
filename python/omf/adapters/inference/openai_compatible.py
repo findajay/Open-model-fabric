@@ -44,7 +44,9 @@ from omf.core.domain.models import (
     ProviderHealth,
     ProviderOperation,
     ResponseFormat,
+    Role,
     TokenUsage,
+    ToolCall,
     utcnow,
 )
 from omf.core.ports.inference import InferenceProvider
@@ -102,6 +104,57 @@ def _content(message: ChatMessage) -> str | list[dict[str, Any]]:
                 }
             )
     return parts
+
+
+def _message(message: ChatMessage) -> dict[str, Any]:
+    out: dict[str, Any] = {"role": message.role.value, "content": _content(message)}
+    if message.tool_calls:
+        out["content"] = message.text() or None
+        out["tool_calls"] = [
+            {
+                "id": c.id,
+                "type": "function",
+                "function": {"name": c.name, "arguments": c.arguments},
+            }
+            for c in message.tool_calls
+        ]
+    if message.role == Role.TOOL:
+        out["tool_call_id"] = message.tool_call_id
+        out["content"] = message.text()
+    return out
+
+
+def _tools(request: InferenceRequest) -> dict[str, Any]:
+    if not request.tools:
+        return {}
+    body: dict[str, Any] = {
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": t.name,
+                    **({"description": t.description} if t.description else {}),
+                    "parameters": t.parameters,
+                },
+            }
+            for t in request.tools
+        ]
+    }
+    if request.tool_choice in ("auto", "none", "required"):
+        body["tool_choice"] = request.tool_choice
+    else:
+        body["tool_choice"] = {"type": "function", "function": {"name": request.tool_choice}}
+    return body
+
+
+def _tool_call(raw: dict[str, Any], position: int, request_id: str) -> ToolCall:
+    function = raw.get("function") or {}
+    arguments = function.get("arguments")
+    return ToolCall(
+        id=str(raw.get("id") or f"call_{request_id}_{position}"),
+        name=str(function.get("name") or ""),
+        arguments=arguments if isinstance(arguments, str) else json.dumps(arguments or {}),
+    )
 
 
 def _usage(raw: dict[str, Any] | None) -> TokenUsage | None:
@@ -167,8 +220,9 @@ class OpenAICompatibleInferenceAdapter(InferenceProvider):
         p = request.params
         body: dict[str, Any] = {
             "model": request.model,
-            "messages": [{"role": m.role.value, "content": _content(m)} for m in request.messages],
+            "messages": [_message(m) for m in request.messages],
             "stream": stream,
+            **_tools(request),
         }
         for key, value in (
             ("temperature", p.temperature),
@@ -200,12 +254,17 @@ class OpenAICompatibleInferenceAdapter(InferenceProvider):
         try:
             choice = payload["choices"][0]
             content = choice["message"].get("content") or ""
-        except (KeyError, IndexError, TypeError) as exc:
+            calls = [
+                _tool_call(raw, i, request.request_id)
+                for i, raw in enumerate(choice["message"].get("tool_calls") or [])
+            ]
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise ProviderError(
                 f"provider {self.provider_id!r} returned an unexpected payload"
             ) from exc
         return GenerationResult(
             content=content,
+            tool_calls=calls,
             finish_reason=choice.get("finish_reason"),
             usage=_usage(payload.get("usage")),
         )
@@ -216,6 +275,9 @@ class OpenAICompatibleInferenceAdapter(InferenceProvider):
         await self._http.ensure_egress()
         finish: str | None = None
         usage: TokenUsage | None = None
+        # Tool calls stream as fragments keyed by "index": the first carries id and name,
+        # later ones append to "arguments". They are emitted once, complete, at the end.
+        partial_calls: dict[int, dict[str, Any]] = {}
         try:
             async with self._http.client.stream(
                 "POST",
@@ -250,12 +312,37 @@ class OpenAICompatibleInferenceAdapter(InferenceProvider):
                         delta = (choice.get("delta") or {}).get("content")
                         if delta:
                             yield GenerationChunk(delta=delta)
+                        for position, fragment in enumerate(
+                            (choice.get("delta") or {}).get("tool_calls") or []
+                        ):
+                            slot = partial_calls.setdefault(
+                                int(fragment.get("index", position)),
+                                {"id": None, "function": {"name": "", "arguments": ""}},
+                            )
+                            slot["id"] = fragment.get("id") or slot["id"]
+                            function = fragment.get("function") or {}
+                            slot["function"]["name"] += function.get("name") or ""
+                            arguments = function.get("arguments")
+                            if isinstance(arguments, dict):  # some servers send objects
+                                arguments = json.dumps(arguments)
+                            slot["function"]["arguments"] += arguments or ""
                         if choice.get("finish_reason"):
                             finish = choice["finish_reason"]
         except OMFError:
             raise
         except httpx.HTTPError as exc:
             self._http.raise_for(exc)
+        if partial_calls:
+            try:
+                calls = [
+                    _tool_call(partial_calls[i], i, request.request_id)
+                    for i in sorted(partial_calls)
+                ]
+            except ValueError as exc:
+                raise ProviderError(
+                    f"provider {self.provider_id!r} streamed a malformed tool call"
+                ) from exc
+            yield GenerationChunk(tool_calls=calls)
         yield GenerationChunk(finish_reason=finish or "stop", usage=usage)
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResult:

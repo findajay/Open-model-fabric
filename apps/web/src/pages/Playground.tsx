@@ -1,6 +1,6 @@
-import type { ModelDeployment } from "@omf/sdk";
+import type { ModelDeployment, ToolCall } from "@omf/sdk";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Loader2, MessageSquarePlus, Trash2, User } from "lucide-react";
+import { Bot, Loader2, MessageSquarePlus, Trash2, User, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CapabilityBadges } from "@/components/CapabilityBadges";
@@ -8,10 +8,16 @@ import { ErrorAlert } from "@/components/ErrorAlert";
 import { Markdown } from "@/components/Markdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input, Label, NativeSelect } from "@/components/ui/input";
+import { Input, Label, NativeSelect, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Composer, type ComposerCapabilities } from "@/features/playground/Composer";
-import { fromConversation, useChat, type UiMessage } from "@/features/playground/useChat";
+import {
+  fromConversation,
+  pendingToolCalls,
+  useChat,
+  type ToolResult,
+  type UiMessage,
+} from "@/features/playground/useChat";
 import { api } from "@/lib/api";
 import { supports } from "@/lib/capabilities";
 import { ms, num } from "@/lib/format";
@@ -21,14 +27,85 @@ const AUTO = "__auto__";
 
 /** Capabilities offered for a selection = those claimed by *every* candidate deployment. */
 export function capabilitiesFor(candidates: ModelDeployment[]): ComposerCapabilities {
-  if (candidates.length === 0) return { vision: false, json: false };
+  if (candidates.length === 0) return { vision: false, json: false, tools: false };
   return {
     vision: candidates.every((d) => supports(d, "vision_input")),
     json: candidates.every((d) => supports(d, "structured_output")),
+    tools: candidates.every((d) => supports(d, "tool_calling")),
   };
 }
 
+function ToolCallView({ call }: { call: ToolCall }) {
+  let args = call.arguments;
+  try {
+    args = JSON.stringify(JSON.parse(call.arguments), null, 2);
+  } catch {
+    // shown as sent: the model produced invalid JSON
+  }
+  return (
+    <div className="mt-2 rounded border bg-muted/40 p-2 text-xs" data-testid="tool-call">
+      <div className="flex items-center gap-1.5 font-medium">
+        <Wrench className="size-3.5" aria-hidden /> {call.name}
+        <span className="font-mono text-[10px] text-muted-foreground">{call.id}</span>
+      </div>
+      <pre className="mt-1 overflow-x-auto font-mono text-[11px]">{args}</pre>
+    </div>
+  );
+}
+
+/** Lets the user supply results for the tool calls the model just made. */
+function ToolResultsForm({
+  calls,
+  disabled,
+  onSubmit,
+}: {
+  calls: ToolCall[];
+  disabled: boolean;
+  onSubmit: (results: ToolResult[]) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const complete = calls.every((c) => (values[c.id] ?? "").trim().length > 0);
+  return (
+    <div className="rounded-lg border border-dashed p-3" aria-label="Tool results">
+      <p className="mb-2 text-xs text-muted-foreground">
+        The model asked to call {calls.length === 1 ? "a tool" : `${calls.length} tools`}. Run{" "}
+        {calls.length === 1 ? "it" : "them"} yourself and enter the result.
+      </p>
+      {calls.map((call) => (
+        <div key={call.id} className="mb-2">
+          <Label htmlFor={`result-${call.id}`} className="font-mono text-xs">
+            {call.name} result
+          </Label>
+          <Textarea
+            id={`result-${call.id}`}
+            value={values[call.id] ?? ""}
+            onChange={(e) => setValues((v) => ({ ...v, [call.id]: e.target.value }))}
+            className="mt-1 min-h-14 font-mono text-xs"
+          />
+        </div>
+      ))}
+      <Button
+        size="sm"
+        disabled={disabled || !complete}
+        onClick={() => onSubmit(calls.map((c) => ({ callId: c.id, content: values[c.id] ?? "" })))}
+      >
+        Send tool results
+      </Button>
+    </div>
+  );
+}
+
 function MessageView({ message }: { message: UiMessage }) {
+  if (message.role === "tool") {
+    return (
+      <div className="ml-10 text-xs" data-testid="message-tool">
+        <span className="font-mono text-muted-foreground">tool result · {message.toolCallId}</span>
+        <pre className="mt-1 whitespace-pre-wrap rounded border bg-muted/40 p-2 font-mono">
+          {message.text}
+        </pre>
+      </div>
+    );
+  }
   const isUser = message.role === "user";
   return (
     <div
@@ -58,6 +135,9 @@ function MessageView({ message }: { message: UiMessage }) {
           {isUser && message.images ? (
             <p className="mt-1 text-xs opacity-80">{message.images} image(s) attached</p>
           ) : null}
+          {(message.toolCalls ?? []).map((call) => (
+            <ToolCallView key={call.id} call={call} />
+          ))}
         </div>
         {message.error && <ErrorAlert className="mt-2" error={new Error(message.error.title)} />}
         {message.error?.code && (
@@ -148,6 +228,13 @@ export function PlaygroundPage() {
     );
   }, [selectedModel, providerId, chatDeployments]);
   const capabilities = capabilitiesFor(candidates);
+  const settings = {
+    providerId: providerId === AUTO ? null : providerId,
+    model: selectedModel || null,
+    temperature,
+    maxTokens,
+    stream,
+  };
 
   const bottom = useRef<HTMLDivElement>(null);
   useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [chat.messages]);
@@ -298,6 +385,14 @@ export function PlaygroundPage() {
             {chat.messages.map((m) => (
               <MessageView key={m.id} message={m} />
             ))}
+            {pendingToolCalls(chat.messages).length > 0 && (
+              <ToolResultsForm
+                key={chat.messages.at(-1)?.id}
+                calls={pendingToolCalls(chat.messages)}
+                disabled={chat.busy}
+                onSubmit={(results) => void chat.sendToolResults(results, settings)}
+              />
+            )}
             <div ref={bottom} />
           </div>
         </div>
@@ -308,15 +403,7 @@ export function PlaygroundPage() {
               capabilities={capabilities}
               streaming={chat.busy}
               onCancel={() => void chat.cancel()}
-              onSend={(input) =>
-                void chat.send(input, {
-                  providerId: providerId === AUTO ? null : providerId,
-                  model: selectedModel || null,
-                  temperature,
-                  maxTokens,
-                  stream,
-                })
-              }
+              onSend={(input) => void chat.send(input, settings)}
             />
           </div>
         </div>

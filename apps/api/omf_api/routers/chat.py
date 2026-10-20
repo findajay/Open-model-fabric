@@ -25,6 +25,8 @@ def _command(body: ChatRequest, request: Request, principal: Principal) -> ChatC
         persist=body.persist,
         sensitivity=body.sensitivity,
         required_capabilities=set(body.required_capabilities),
+        tools=body.tools,
+        tool_choice=body.tool_choice,
         request_id=request.state.request_id,
         owner=principal.name,
         owner_is_admin=principal.role == "admin",

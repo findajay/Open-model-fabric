@@ -107,6 +107,62 @@ uploads use `server.max_upload_bytes`. Oversized bodies get 413 `request_too_lar
 }
 ```
 
+`content` can also be a list of parts:
+`{"type": "text", "text": "..."}` and
+`{"type": "image", "media_type": "image/png", "data_base64": "..."}`. Allowed image types
+are png, jpeg, webp and gif, up to about 6 MB per image, with at most 64 parts per
+message and 200 messages per request.
+
+### Tool calling
+
+OMF passes tools through to the model and returns the calls the model asks for. **OMF
+never executes a tool.** The client runs it and sends the result back.
+
+```jsonc
+// 1. Offer tools. tool_choice: "auto" (default), "none", "required", or a tool's name.
+{
+  "messages": [{"role": "user", "content": "Weather in Paris?"}],
+  "tools": [{"name": "get_weather", "description": "Current weather",
+             "parameters": {"type": "object", "properties": {"city": {"type": "string"}},
+                            "required": ["city"]}}]
+}
+// -> finish_reason "tool_calls";
+//    message.tool_calls = [{"id": "call_1", "name": "get_weather", "arguments": "{\"city\": \"Paris\"}"}]
+
+// 2. Return the result (repeat the assistant message, or continue via conversation_id).
+{
+  "messages": [
+    {"role": "user", "content": "Weather in Paris?"},
+    {"role": "assistant", "content": "", "tool_calls": [{"id": "call_1", "name": "get_weather", "arguments": "{\"city\": \"Paris\"}"}]},
+    {"role": "tool", "tool_call_id": "call_1", "content": "18 C, sunny"}
+  ],
+  "tools": [ /* same tools */ ]
+}
+```
+
+Rules:
+
+- A request needs the `tool_calling` capability when it offers tools (unless
+  `tool_choice` is `"none"`) or contains tool messages or tool calls.
+- Tool names must be unique and match `^[a-zA-Z0-9_-]{1,64}$`. `parameters` must be a
+  JSON Schema object.
+- Without `conversation_id`, every `tool` message must answer a `tool_calls` id from an
+  earlier assistant message in the same request.
+- `arguments` is the JSON text the model produced. It is untrusted model output: validate
+  it before running anything.
+- When streaming, tool calls arrive complete in `message.completed.tool_calls`. Argument
+  fragments are never streamed to clients.
+
+Engine differences that OMF normalises:
+
+- **Ollama** has no call ids, so OMF generates them. Ollama also takes arguments as an
+  object, matches results by `tool_name`, and reports `done_reason: stop`; OMF reports
+  `finish_reason: tool_calls`. Ollama has no `tool_choice`, so `required` or a named tool
+  returns 501 `operation_not_supported`.
+- **OpenAI-compatible** servers stream arguments as fragments keyed by `index`; OMF
+  reassembles them. vLLM needs `--enable-auto-tool-choice` and a `--tool-call-parser`,
+  and llama.cpp needs `--jinja`. Declare `tool_calling` for such models.
+
 ### Embeddings request
 
 ```jsonc
@@ -131,11 +187,6 @@ model is never used for embeddings. Adapters:
 On OpenAI-compatible servers, declare the model as `capabilities: [embeddings]`, because
 `/v1/models` cannot say which models embed.
 
-`content` can also be a list of parts:
-`{"type": "text", "text": "..."}` and
-`{"type": "image", "media_type": "image/png", "data_base64": "..."}`. Allowed image types
-are png, jpeg, webp and gif, up to about 6 MB per image, with at most 64 parts per
-message and 200 messages per request.
 
 ## Server-Sent Events contract
 
@@ -158,7 +209,7 @@ data: {"request_id":"req_4540...","usage":{"prompt_tokens":1,"completion_tokens"
 
 id: 3
 event: message.completed
-data: {"request_id":"req_4540...","message_id":"msg_4e0a...","conversation_id":null,"finish_reason":"length","timings":{"total_ms":102.01,"ttft_ms":40.61,"tokens_per_second":81.43},"usage":{...}}
+data: {"request_id":"req_4540...","message_id":"msg_4e0a...","conversation_id":null,"finish_reason":"length","timings":{"total_ms":102.01,"ttft_ms":40.61,"tokens_per_second":81.43},"usage":{...},"tool_calls":[]}
 ```
 
 A `: keep-alive` comment is sent after 15 s without events, for example while a model

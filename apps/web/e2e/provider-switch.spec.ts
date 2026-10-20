@@ -124,3 +124,25 @@ test("streaming can be stopped from the UI", async ({ page }) => {
   await expect(page.getByTestId("message-assistant").last()).toContainText(/request_cancelled|cancelled/i);
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
+
+test("tool calling loop: the model asks, the user supplies the result", async ({ page }) => {
+  await page.goto("/playground");
+  await page.getByRole("button", { name: "New chat" }).click();
+  await page.getByLabel("Provider", { exact: true }).selectOption("mock");
+  await page.getByLabel("Model", { exact: true }).selectOption("mock-chat");
+  await page.getByRole("switch", { name: "Tools" }).click();
+  await page.getByRole("textbox", { name: "Message" }).fill("Paris");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const call = page.getByTestId("tool-call");
+  await expect(call).toContainText("get_weather");
+  await expect(call).toContainText('"city": "Paris"');
+  await page.getByLabel("get_weather result").fill("18 C, sunny");
+  await page.getByRole("button", { name: "Send tool results" }).click();
+
+  await expect(page.getByTestId("message-tool")).toContainText("18 C, sunny");
+  await expect(page.getByTestId("message-assistant").last()).toContainText(
+    "get_weather returned: 18 C, sunny",
+  );
+  await expect(page.getByRole("button", { name: "Send tool results" })).toHaveCount(0);
+});

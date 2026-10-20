@@ -62,6 +62,8 @@ from omf.core.domain.models import (
     Sensitivity,
     Timings,
     TokenUsage,
+    ToolCall,
+    ToolDefinition,
     new_id,
     utcnow,
 )
@@ -85,6 +87,8 @@ class ChatCommand:
     persist: bool = False
     sensitivity: Sensitivity = Sensitivity.NORMAL
     required_capabilities: set[Capability] = field(default_factory=set)
+    tools: list[ToolDefinition] = field(default_factory=list)
+    tool_choice: str = "auto"
     request_id: str = field(default_factory=lambda: new_id("req"))
     record: bool = True
     owner: str | None = None
@@ -214,6 +218,10 @@ class InferenceService:
             required.add(Capability.VISION_INPUT)
         if cmd.params.response_format == ResponseFormat.JSON:
             required.add(Capability.STRUCTURED_OUTPUT)
+        if (cmd.tools and cmd.tool_choice != "none") or any(
+            m.role == Role.TOOL or m.tool_calls for m in cmd.messages
+        ):
+            required.add(Capability.TOOL_CALLING)
         if streaming:
             required.add(Capability.STREAMING)
         return RouteRequest(
@@ -403,11 +411,18 @@ class InferenceService:
         return conversation
 
     def _check_context(
-        self, deployment: ModelDeployment, messages: list[ChatMessage], params: GenerationParams
+        self,
+        deployment: ModelDeployment,
+        messages: list[ChatMessage],
+        params: GenerationParams,
+        tools: list[ToolDefinition] = (),  # type: ignore[assignment]
     ) -> None:
         if not deployment.context_window:
             return
-        prompt_tokens = sum(estimate_tokens(m.text()) for m in messages)
+        prompt_tokens = sum(
+            estimate_tokens(m.text()) + sum(estimate_tokens(c.arguments) for c in m.tool_calls)
+            for m in messages
+        ) + sum(estimate_tokens(t.model_dump_json()) for t in tools)
         needed = prompt_tokens + (params.max_tokens or 0)
         if needed > deployment.context_window:
             raise ContextLengthExceeded(
@@ -427,13 +442,15 @@ class InferenceService:
             attempts = list(plan.considered)
             last_error: OMFError | None = None
             for index, deployment in enumerate(plan.candidates[: plan.max_attempts]):
-                self._check_context(deployment, messages, cmd.params)
+                self._check_context(deployment, messages, cmd.params, cmd.tools)
                 self._track(cmd.request_id, deployment.provider_id)
                 request = InferenceRequest(
                     request_id=cmd.request_id,
                     model=deployment.provider_model,
                     messages=messages,
                     params=cmd.params,
+                    tools=cmd.tools,
+                    tool_choice=cmd.tool_choice,
                 )
                 call_started = time.perf_counter()
                 try:
@@ -458,8 +475,11 @@ class InferenceService:
                             outcome="succeeded",
                         )
                     )
+                    finish_reason = "tool_calls" if result.tool_calls else result.finish_reason
                     usage = result.usage or TokenUsage(
-                        completion_tokens=estimate_tokens(result.content), source="estimated"
+                        completion_tokens=estimate_tokens(result.content)
+                        + sum(estimate_tokens(c.arguments) for c in result.tool_calls),
+                        source="estimated",
                     )
                     timings = Timings(
                         total_ms=round(total_ms, 2),
@@ -475,11 +495,12 @@ class InferenceService:
                     reply = ChatMessage(
                         role=Role.ASSISTANT,
                         content=result.content,
+                        tool_calls=result.tool_calls,
                         metadata={
                             "request_id": cmd.request_id,
                             "provider_id": deployment.provider_id,
                             "model": deployment.provider_model,
-                            "finish_reason": result.finish_reason,
+                            "finish_reason": finish_reason,
                             "usage": usage.model_dump(),
                             "timings": timings.model_dump(),
                         },
@@ -505,7 +526,7 @@ class InferenceService:
                         model=deployment.provider_model,
                         model_id=deployment.model_id,
                         message=reply,
-                        finish_reason=result.finish_reason,
+                        finish_reason=finish_reason,
                         usage=usage,
                         timings=timings,
                         route=route,
@@ -561,6 +582,7 @@ class InferenceService:
         started = time.perf_counter()
         delivered = 0
         content: list[str] = []
+        tool_calls: list[ToolCall] = []
         plan: RoutePlan | None = None
         deployment: ModelDeployment | None = None
         attempts: list[RouteAttempt] = []
@@ -620,18 +642,22 @@ class InferenceService:
             last_error: OMFError | None = None
             max_attempts = min(len(plan.candidates), plan.max_attempts)
             for index, deployment in enumerate(plan.candidates[:max_attempts]):
-                self._check_context(deployment, messages, cmd.params)
+                self._check_context(deployment, messages, cmd.params, cmd.tools)
                 self._track(cmd.request_id, deployment.provider_id)
                 request = InferenceRequest(
                     request_id=cmd.request_id,
                     model=deployment.provider_model,
                     messages=messages,
                     params=cmd.params,
+                    tools=cmd.tools,
+                    tool_choice=cmd.tool_choice,
                 )
                 attempt_started = time.perf_counter()
                 ttft_ms: float | None = None
                 usage: TokenUsage | None = None
                 finish_reason: str | None = None
+                announced = False  # message.started sent for this attempt
+                tool_calls.clear()  # a failed attempt's calls never reach the next one
                 timeout = self._timeout(deployment.provider_id)
                 try:
                     async with self._providers.lease(deployment.provider_id) as adapter:
@@ -640,7 +666,10 @@ class InferenceService:
                                 adapter.stream_generate(request)
                             ) as chunks:
                                 async for chunk in chunks:
-                                    if delivered == 0 and (chunk.delta or chunk.finish_reason):
+                                    if not announced and (
+                                        chunk.delta or chunk.finish_reason or chunk.tool_calls
+                                    ):
+                                        announced = True
                                         attempts.append(
                                             RouteAttempt(
                                                 provider_id=deployment.provider_id,
@@ -680,11 +709,12 @@ class InferenceService:
                                             ),
                                         )
                                         delivered += 1
+                                    tool_calls.extend(chunk.tool_calls)
                                     if chunk.usage is not None:
                                         usage = chunk.usage
                                     if chunk.finish_reason:
                                         finish_reason = chunk.finish_reason
-                    if delivered == 0 and not finish_reason:
+                    if delivered == 0 and not finish_reason and not tool_calls:
                         raise ProviderError(
                             "provider returned an empty stream",
                             details={"provider_id": deployment.provider_id},
@@ -700,9 +730,13 @@ class InferenceService:
                     total_ms = (time.perf_counter() - attempt_started) * 1000
                     self._health.record_success(deployment.provider_id, total_ms)
                     text = "".join(content)
+                    if tool_calls:
+                        finish_reason = "tool_calls"
                     if usage is None:
                         usage = TokenUsage(
-                            completion_tokens=estimate_tokens(text), source="estimated"
+                            completion_tokens=estimate_tokens(text)
+                            + sum(estimate_tokens(c.arguments) for c in tool_calls),
+                            source="estimated",
                         )
                     timings = Timings(
                         total_ms=round(total_ms, 2),
@@ -712,6 +746,7 @@ class InferenceService:
                     reply = ChatMessage(
                         role=Role.ASSISTANT,
                         content=text,
+                        tool_calls=tool_calls,
                         metadata={
                             "request_id": cmd.request_id,
                             "provider_id": deployment.provider_id,
@@ -748,6 +783,7 @@ class InferenceService:
                             finish_reason=finish_reason,
                             timings=timings,
                             usage=usage,
+                            tool_calls=tool_calls,
                         ),
                     )
                     return
