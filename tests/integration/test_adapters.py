@@ -286,3 +286,25 @@ def test_opentelemetry_exporter_records_metrics_and_spans() -> None:
     finished = spans.get_finished_spans()
     assert finished[0].name == "omf.chat" and finished[0].attributes["provider_id"] == "mock"
     otel.shutdown()
+
+
+async def test_egress_is_checked_on_first_use_even_right_after_boot(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: the connect-time cache used a 0.0 sentinel, so on a host whose
+    monotonic clock (time since boot) was below the cache window, the very first check
+    was skipped. Found on a freshly booted CI runner."""
+    from omf.core.domain.errors import EgressDenied
+
+    monkeypatch.setattr("omf.adapters.inference._http.time.monotonic", lambda: 5.0)
+    strict = AdapterContext(
+        resolve_secret=CTX.resolve_secret, egress=EgressPolicy(), telemetry=CTX.telemetry
+    )
+    adapter = create_ollama(
+        ProviderDefinition(id="o", adapter_type="ollama"),
+        OllamaConfig(base_url="http://localhost:11434"),
+        strict,
+    )
+    with pytest.raises(EgressDenied):
+        await adapter.list_models()
+    await adapter.aclose()

@@ -44,6 +44,12 @@ The CI workflow is meant to run `pip-audit` (in the dev dependency group) and
 
 ## Known limitations
 
+- **Fixed in this release:** the connect-time egress check cached its result with a
+  `0.0` "never checked" sentinel compared against `time.monotonic()`. On a host that had
+  been up for less than 60 seconds (e.g. a freshly started microVM), the first check per
+  endpoint was skipped. Found by CI on a freshly booted runner; covered by a regression
+  test.
+
 - **DNS rebinding:** resolution and connection are separate steps. Mitigations: pin IP
   literals, put an egress proxy or Kubernetes `NetworkPolicy` in front of the API, keep
   `allowed_hosts` tight.
