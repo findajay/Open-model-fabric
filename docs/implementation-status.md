@@ -324,12 +324,41 @@ hand-derived golden string-to-sign is in `tests/integration/test_azure_blob.py`.
 
 **Not tested** against real Azure Storage accounts.
 
+## Phase 10 — Audio and the embeddings UI
+
+**Implemented.**
+* `POST /api/v1/audio/transcriptions`, routed on `audio_input`. It checks the content
+  type against an allowlist and the file's magic bytes, and enforces a 25 MB cap.
+* `POST /api/v1/audio/speech`, routed on `audio_output`. It returns audio bytes.
+* Optional port operations `transcribe` and `synthesize`.
+* Adapters:
+  * mock: a deterministic transcript and a WAV tone;
+  * OpenAI-compatible: OpenAI audio wire format, with field names checked against the
+    OpenAI OpenAPI specification;
+  * Ollama: none, because Ollama has no audio API (checked against its `docs/api.md`).
+* Records are tagged `transcription` or `speech`, and metrics filter by operation.
+* SDK methods `transcribe` (FormData) and `speech` (Blob).
+* New UI pages:
+  * **Embeddings**: a cosine-similarity matrix.
+  * **Audio**: upload or microphone recording for transcription, and text-to-speech
+    with playback.
+
+**Tests.**
+* `tests/integration/test_audio.py`: the mock, upload validation, capability routing,
+  magic-byte sniffing, the OpenAI wire format against the emulator (exact multipart
+  and JSON fields), verbose transcription, and Ollama returning 501. Disabling the
+  sniffing check or dropping the `language` field each make tests fail.
+* Vitest tests for the matrix and deployment helpers.
+* Playwright tests: the embeddings matrix, transcribing an uploaded WAV, and playing
+  synthesized speech (the browser decodes it).
+
+No real speech model was run. Only the mock and the OpenAI-compatible protocol
+emulator were used. Microphone recording relies on the browser's MediaRecorder and
+was not exercised in automated tests.
+
 ## Remaining work (not implemented)
 
-* Audio input and output. These capabilities exist in the vocabulary, the catalog and
-  the UI badges only.
 * Server-side tool execution. This is deliberately out of scope; see ADR-0013.
-* A UI for embeddings: the endpoint and SDK exist, but no screen calls them.
 * Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
   provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters
   against real clusters and accounts.

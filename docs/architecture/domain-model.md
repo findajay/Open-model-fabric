@@ -43,7 +43,8 @@ Entities are pydantic models ([ADR-0002](adr/0002-pydantic-in-domain.md)).
 
 Vocabulary (`Capability`): `text_generation`, `chat`, `vision_input`, `embeddings`,
 `tool_calling`, `structured_output`, `streaming`, `audio_input`, `audio_output`. The audio
-capabilities exist in the vocabulary only; no adapter implements audio requests.
+capabilities route speech-to-text and text-to-speech requests (mock and OpenAI-compatible
+adapters; Ollama has no audio API).
 
 Each `CapabilityClaim` carries one of three `Evidence` levels, from strongest to weakest:
 

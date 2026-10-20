@@ -11,6 +11,10 @@ const DashboardPage = lazy(() =>
 const PlaygroundPage = lazy(() =>
   import("@/pages/Playground").then((m) => ({ default: m.PlaygroundPage })),
 );
+const EmbeddingsPage = lazy(() =>
+  import("@/pages/Embeddings").then((m) => ({ default: m.EmbeddingsPage })),
+);
+const AudioPage = lazy(() => import("@/pages/Audio").then((m) => ({ default: m.AudioPage })));
 const ModelsPage = lazy(() => import("@/pages/Models").then((m) => ({ default: m.ModelsPage })));
 const ProvidersPage = lazy(() =>
   import("@/pages/Providers").then((m) => ({ default: m.ProvidersPage })),
@@ -40,6 +44,8 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<DashboardPage />} />
           <Route path="playground" element={<PlaygroundPage />} />
+          <Route path="embeddings" element={<EmbeddingsPage />} />
+          <Route path="audio" element={<AudioPage />} />
           <Route path="models" element={<ModelsPage />} />
           <Route path="providers" element={<ProvidersPage />} />
           <Route path="infrastructure" element={<InfrastructurePage />} />

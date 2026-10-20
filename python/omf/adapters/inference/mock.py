@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import json
 import math
 import re
+import struct
 import time
+import wave
 from collections.abc import AsyncGenerator
 from typing import Any, Literal
 
@@ -26,7 +29,12 @@ from omf.core.domain.capabilities import (
     Evidence,
     Modality,
 )
-from omf.core.domain.errors import CapabilityNotSupported, ModelNotFound, ProviderUnavailable
+from omf.core.domain.errors import (
+    CapabilityNotSupported,
+    ModelNotFound,
+    ProviderUnavailable,
+    ValidationFailed,
+)
 from omf.core.domain.models import (
     AuthRequirement,
     DiscoveredModel,
@@ -42,8 +50,12 @@ from omf.core.domain.models import (
     ProviderOperation,
     ResponseFormat,
     Role,
+    SpeechRequest,
+    SpeechResult,
     TokenUsage,
     ToolCall,
+    TranscriptionRequest,
+    TranscriptionResult,
     utcnow,
 )
 from omf.core.ports.inference import InferenceProvider
@@ -79,6 +91,8 @@ def _default_models() -> list[MockModelConfig]:
             capabilities=[Capability.CHAT, Capability.TEXT_GENERATION, Capability.VISION_INPUT],
         ),
         MockModelConfig(name="mock-embed", capabilities=[Capability.EMBEDDINGS]),
+        MockModelConfig(name="mock-whisper", capabilities=[Capability.AUDIO_INPUT]),
+        MockModelConfig(name="mock-tts", capabilities=[Capability.AUDIO_OUTPUT]),
     ]
 
 
@@ -237,6 +251,40 @@ class MockInferenceAdapter(InferenceProvider):
             usage=TokenUsage(prompt_tokens=tokens, total_tokens=tokens, source="provider"),
         )
 
+    async def transcribe(self, request: TranscriptionRequest) -> TranscriptionResult:
+        """Deterministic stand-in: describes the audio instead of recognising speech."""
+        self._check_outage()
+        self._model(request.model, Capability.AUDIO_INPUT)
+        await asyncio.sleep(self._config.first_token_delay_ms / 1000)
+        digest = hashlib.sha256(request.audio).hexdigest()[:12]
+        duration = _wav_duration(request.audio)
+        text = f"[mock transcription of {len(request.audio)} bytes, sha256 {digest}]"
+        if request.language:
+            text += f" language={request.language}"
+        return TranscriptionResult(
+            text=text,
+            language=request.language,
+            duration_s=duration,
+            usage=TokenUsage(prompt_tokens=None, completion_tokens=len(_tokens(text))),
+        )
+
+    async def synthesize(self, request: SpeechRequest) -> SpeechResult:
+        """A sine tone whose length follows the text (about 80 ms per word, at most 5 s).
+
+        Only WAV: the standard library cannot encode MP3, Opus or FLAC.
+        """
+        self._check_outage()
+        self._model(request.model, Capability.AUDIO_OUTPUT)
+        if request.format != "wav":
+            raise ValidationFailed(
+                f"the mock speech model only produces wav, not {request.format!r}",
+                details={"supported_formats": ["wav"]},
+            )
+        await asyncio.sleep(self._config.first_token_delay_ms / 1000)
+        words = max(1, len(request.input.split()))
+        seconds = min(5.0, 0.08 * words / request.speed)
+        return SpeechResult(audio=_sine_wav(seconds), content_type="audio/wav")
+
     # ------------------------------------------------------------------ internals
 
     def _model(self, name: str, capability: Capability) -> MockModelConfig:
@@ -324,6 +372,31 @@ class MockInferenceAdapter(InferenceProvider):
         return "\n".join(lines)
 
 
+def _wav_duration(audio: bytes) -> float | None:
+    try:
+        with wave.open(io.BytesIO(audio)) as wav:
+            frames: int = wav.getnframes()
+            rate: int = wav.getframerate()
+        return round(frames / float(rate), 3)
+    except (wave.Error, EOFError, ZeroDivisionError):
+        return None
+
+
+def _sine_wav(seconds: float, rate: int = 16_000, freq: float = 440.0) -> bytes:
+    frames = int(rate * seconds)
+    samples = b"".join(
+        struct.pack("<h", int(12_000 * math.sin(2 * math.pi * freq * i / rate)))
+        for i in range(frames)
+    )
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        wav.writeframes(samples)
+    return buffer.getvalue()
+
+
 def _example_value(schema: dict[str, Any], prompt: str) -> Any:
     if schema.get("enum"):
         return schema["enum"][0]
@@ -365,8 +438,10 @@ CAPABILITIES = ProviderCapabilities(
         ProviderOperation.HEALTH_CHECK,
         ProviderOperation.CANCEL,
         ProviderOperation.EMBED,
+        ProviderOperation.TRANSCRIBE,
+        ProviderOperation.SYNTHESIZE,
     ],
-    modalities=[Modality.TEXT, Modality.IMAGE],
+    modalities=[Modality.TEXT, Modality.IMAGE, Modality.AUDIO],
     streaming=True,
     health_check=True,
     authentication=AuthRequirement.NONE,

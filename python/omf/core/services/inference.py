@@ -19,9 +19,9 @@ import asyncio
 import contextlib
 import logging
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar, TypeVar
 
 from omf.core.domain.capabilities import Capability
 from omf.core.domain.errors import (
@@ -60,13 +60,18 @@ from omf.core.domain.models import (
     RouteAttempt,
     RouteDecision,
     Sensitivity,
+    SpeechRequest,
+    SpeechResult,
     Timings,
     TokenUsage,
     ToolCall,
     ToolDefinition,
+    TranscriptionRequest,
+    TranscriptionResponse,
     new_id,
     utcnow,
 )
+from omf.core.ports.inference import InferenceProvider
 from omf.core.ports.metadata import (
     ConversationRepository,
     InferenceRecordRepository,
@@ -109,6 +114,39 @@ class EmbedCommand:
     sensitivity: Sensitivity = Sensitivity.NORMAL
     request_id: str = field(default_factory=lambda: new_id("emb"))
     record: bool = True
+
+
+@dataclass
+class TranscribeCommand:
+    audio: bytes
+    filename: str
+    content_type: str
+    provider_id: str | None = None
+    model: str | None = None
+    language: str | None = None
+    prompt: str | None = None
+    sensitivity: Sensitivity = Sensitivity.NORMAL
+    request_id: str = field(default_factory=lambda: new_id("stt"))
+    record: bool = True
+    operation: ClassVar[str] = "transcription"
+
+
+@dataclass
+class SpeechCommand:
+    input: str
+    voice: str
+    format: str = "mp3"
+    speed: float = 1.0
+    provider_id: str | None = None
+    model: str | None = None
+    sensitivity: Sensitivity = Sensitivity.NORMAL
+    request_id: str = field(default_factory=lambda: new_id("tts"))
+    record: bool = True
+    operation: ClassVar[str] = "speech"
+
+
+AudioCommand = TranscribeCommand | SpeechCommand
+T = TypeVar("T")
 
 
 def estimate_tokens(text: str) -> int:
@@ -375,6 +413,164 @@ class InferenceService:
                             attempts=attempts,
                         ),
                     )
+                assert last_error is not None
+                if not isinstance(last_error, OperationNotSupported):
+                    self._health.record_failure(deployment.provider_id, last_error)
+                attempts.append(
+                    RouteAttempt(
+                        provider_id=deployment.provider_id,
+                        model=deployment.provider_model,
+                        outcome="failed",
+                        reason=last_error.message,
+                        error_code=last_error.code,
+                    )
+                )
+                is_last = index >= min(len(plan.candidates), plan.max_attempts) - 1
+                if not last_error.retryable or is_last:
+                    break
+            assert last_error is not None
+            last_error.details.setdefault("attempts", [a.model_dump() for a in attempts])
+            raise last_error
+        except OMFError as exc:
+            await self._record(
+                cmd,
+                RequestStatus.FAILED,
+                None,
+                plan,
+                len(attempts),
+                Timings(total_ms=(time.perf_counter() - started) * 1000),
+                None,
+                exc.code,
+                streaming=False,
+            )
+            raise
+
+    async def transcribe(self, cmd: TranscribeCommand) -> TranscriptionResponse:
+        """Speech-to-text with a model that declares ``audio_input``."""
+
+        def call(adapter: InferenceProvider, deployment: ModelDeployment) -> Any:
+            return adapter.transcribe(
+                TranscriptionRequest(
+                    request_id=cmd.request_id,
+                    model=deployment.provider_model,
+                    audio=cmd.audio,
+                    filename=cmd.filename,
+                    content_type=cmd.content_type,
+                    language=cmd.language,
+                    prompt=cmd.prompt,
+                )
+            )
+
+        result, deployment, timings, usage, route = await self._routed_call(
+            cmd, Capability.AUDIO_INPUT, call, lambda r: r.usage
+        )
+        return TranscriptionResponse(
+            request_id=cmd.request_id,
+            provider_id=deployment.provider_id,
+            model=deployment.provider_model,
+            model_id=deployment.model_id,
+            text=result.text,
+            language=result.language,
+            duration_s=result.duration_s,
+            usage=usage,
+            timings=timings,
+            route=route,
+        )
+
+    async def synthesize(self, cmd: SpeechCommand) -> tuple[SpeechResult, RouteDecision]:
+        """Text-to-speech with a model that declares ``audio_output``."""
+
+        def call(adapter: InferenceProvider, deployment: ModelDeployment) -> Any:
+            return adapter.synthesize(
+                SpeechRequest(
+                    request_id=cmd.request_id,
+                    model=deployment.provider_model,
+                    input=cmd.input,
+                    voice=cmd.voice,
+                    format=cmd.format,
+                    speed=cmd.speed,
+                )
+            )
+
+        result, _deployment, _timings, _usage, route = await self._routed_call(
+            cmd,
+            Capability.AUDIO_OUTPUT,
+            call,
+            lambda _r: TokenUsage(prompt_tokens=estimate_tokens(cmd.input), source="estimated"),
+        )
+        return result, route
+
+    async def _routed_call(
+        self,
+        cmd: AudioCommand,
+        capability: Capability,
+        call: Callable[[InferenceProvider, ModelDeployment], Awaitable[T]],
+        usage_of: Callable[[T], TokenUsage | None],
+    ) -> tuple[T, ModelDeployment, Timings, TokenUsage | None, RouteDecision]:
+        """Route on one capability and call the chosen adapter, with the same retry and
+        recording rules as embeddings (no side effects, so retryable errors may fall back
+        when the policy allows)."""
+        started = time.perf_counter()
+        plan: RoutePlan | None = None
+        attempts: list[RouteAttempt] = []
+        try:
+            plan = await self._router.plan(
+                RouteRequest(
+                    provider_id=cmd.provider_id,
+                    model=cmd.model,
+                    required={capability},
+                    sensitivity=cmd.sensitivity,
+                    default_model=None,  # the default model is a chat model
+                ),
+                self._settings.routing_policy(),
+            )
+            attempts = list(plan.considered)
+            last_error: OMFError | None = None
+            for index, deployment in enumerate(plan.candidates[: plan.max_attempts]):
+                call_started = time.perf_counter()
+                try:
+                    timeout = self._timeout(deployment.provider_id)
+                    async with self._providers.lease(deployment.provider_id) as adapter:
+                        async with asyncio.timeout(timeout):
+                            result = await call(adapter, deployment)
+                except TimeoutError:
+                    last_error = ProviderTimeout(
+                        f"provider {deployment.provider_id!r} exceeded {timeout}s",
+                        details={"provider_id": deployment.provider_id},
+                    )
+                except OMFError as exc:
+                    last_error = exc
+                else:
+                    total_ms = (time.perf_counter() - call_started) * 1000
+                    self._health.record_success(deployment.provider_id, total_ms)
+                    attempts.append(
+                        RouteAttempt(
+                            provider_id=deployment.provider_id,
+                            model=deployment.provider_model,
+                            outcome="succeeded",
+                        )
+                    )
+                    usage = usage_of(result)
+                    timings = Timings(total_ms=round(total_ms, 2))
+                    await self._record(
+                        cmd,
+                        RequestStatus.COMPLETED,
+                        deployment,
+                        plan,
+                        len(attempts),
+                        timings,
+                        usage,
+                        None,
+                        streaming=False,
+                    )
+                    route = RouteDecision(
+                        policy=plan.mode.value,
+                        provider_id=deployment.provider_id,
+                        model=deployment.provider_model,
+                        model_id=deployment.model_id,
+                        attempts=attempts,
+                    )
+                    return result, deployment, timings, usage, route
                 assert last_error is not None
                 if not isinstance(last_error, OperationNotSupported):
                     self._health.record_failure(deployment.provider_id, last_error)
@@ -901,7 +1097,7 @@ class InferenceService:
 
     async def _record(
         self,
-        cmd: ChatCommand | EmbedCommand,
+        cmd: ChatCommand | EmbedCommand | AudioCommand,
         status: RequestStatus,
         deployment: ModelDeployment | None,
         plan: RoutePlan | None,
@@ -914,7 +1110,9 @@ class InferenceService:
     ) -> None:
         provider_id = deployment.provider_id if deployment else (cmd.provider_id or None)
         model = deployment.provider_model if deployment else cmd.model
-        operation = "embeddings" if isinstance(cmd, EmbedCommand) else "chat"
+        operation = getattr(cmd, "operation", None) or (
+            "embeddings" if isinstance(cmd, EmbedCommand) else "chat"
+        )
         attrs = {
             "operation": operation,
             "provider_id": provider_id or "none",

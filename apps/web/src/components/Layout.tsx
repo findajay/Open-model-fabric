@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  AudioLines,
   Boxes,
   Cpu,
   FlaskConical,
@@ -9,6 +10,7 @@ import {
   Moon,
   PlugZap,
   Settings,
+  Sigma,
   Sun,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -20,6 +22,8 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { to: "/", label: "Dashboard", icon: Gauge, end: true },
   { to: "/playground", label: "AI Playground", icon: MessageSquare },
+  { to: "/embeddings", label: "Embeddings", icon: Sigma },
+  { to: "/audio", label: "Audio", icon: AudioLines },
   { to: "/models", label: "Model Registry", icon: Boxes },
   { to: "/providers", label: "Providers", icon: PlugZap },
   { to: "/infrastructure", label: "Infrastructure", icon: Cpu },
