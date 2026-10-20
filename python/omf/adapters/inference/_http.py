@@ -49,7 +49,9 @@ class HttpEndpoint:
         self._preflight_error = preflight_error
         self.base_url = base_url.rstrip("/")
         self._egress = egress
-        self._egress_checked_at = 0.0
+        # None until the first successful check. (A 0.0 sentinel would skip the check on
+        # hosts up for less than the cache window: time.monotonic() counts from boot.)
+        self._egress_checked_at: float | None = None
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             headers=headers or {},
@@ -68,7 +70,7 @@ class HttpEndpoint:
         if self._preflight_error is not None:
             raise self._preflight_error
         now = time.monotonic()
-        if now - self._egress_checked_at < _EGRESS_CACHE_S:
+        if self._egress_checked_at is not None and now - self._egress_checked_at < _EGRESS_CACHE_S:
             return
         try:
             await self._egress.check_url(self.base_url)
