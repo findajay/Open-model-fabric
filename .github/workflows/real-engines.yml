@@ -6,6 +6,11 @@ name: Real engines
 
 on:
   workflow_dispatch:
+  # Also when the real-engine tests or this workflow change (any branch).
+  push:
+    paths:
+      - "tests/real_engine/**"
+      - ".github/workflows/real-engines.yml"
   schedule:
     - cron: "17 4 * * 1"
 
