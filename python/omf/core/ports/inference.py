@@ -3,7 +3,8 @@
 Mandatory operations: ``get_capabilities``, ``list_models``, ``generate``,
 ``stream_generate``, ``health_check``.
 
-Optional operations: ``cancel`` and ``embed``. An adapter that does not support them
+Optional operations: ``cancel``, ``embed``, ``transcribe`` (speech-to-text) and
+``synthesize`` (text-to-speech). An adapter that does not support them
 inherits the default implementations, which raise
 :class:`~omf.core.domain.errors.OperationNotSupported`. Client-side cancellation
 (closing the stream) is always available: the application service cancels the task that
@@ -26,6 +27,10 @@ from omf.core.domain.models import (
     InferenceRequest,
     ProviderCapabilities,
     ProviderHealth,
+    SpeechRequest,
+    SpeechResult,
+    TranscriptionRequest,
+    TranscriptionResult,
 )
 
 
@@ -73,6 +78,20 @@ class InferenceProvider(ABC):
         raise OperationNotSupported(
             f"provider {self.provider_id!r} does not support embeddings",
             details={"operation": "embed", "provider_id": self.provider_id},
+        )
+
+    async def transcribe(self, request: TranscriptionRequest) -> TranscriptionResult:
+        """Optional: speech-to-text."""
+        raise OperationNotSupported(
+            f"provider {self.provider_id!r} does not support transcription",
+            details={"operation": "transcribe", "provider_id": self.provider_id},
+        )
+
+    async def synthesize(self, request: SpeechRequest) -> SpeechResult:
+        """Optional: text-to-speech."""
+        raise OperationNotSupported(
+            f"provider {self.provider_id!r} does not support speech synthesis",
+            details={"operation": "synthesize", "provider_id": self.provider_id},
         )
 
     async def aclose(self) -> None:

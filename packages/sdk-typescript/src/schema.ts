@@ -21,6 +21,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audio/speech": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Text-to-speech with a model that declares audio_output (returns audio bytes) */
+        post: operations["create_speech_api_v1_audio_speech_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audio/transcriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Speech-to-text with a model that declares audio_input */
+        post: operations["create_transcription_api_v1_audio_transcriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit": {
         parameters: {
             query?: never;
@@ -928,6 +962,24 @@ export interface components {
             /** Provider Id */
             provider_id: string;
         };
+        /** Body_create_transcription_api_v1_audio_transcriptions_post */
+        Body_create_transcription_api_v1_audio_transcriptions_post: {
+            /**
+             * File
+             * @description wav, mp3, m4a, ogg, webm or flac
+             */
+            file: string;
+            /** Language */
+            language?: string | null;
+            /** Model */
+            model?: string | null;
+            /** Prompt */
+            prompt?: string | null;
+            /** Provider Id */
+            provider_id?: string | null;
+            /** @default normal */
+            sensitivity?: components["schemas"]["Sensitivity"];
+        };
         /** Body_upload_artifact_api_v1_storage__storage_id__artifacts_post */
         Body_upload_artifact_api_v1_storage__storage_id__artifacts_post: {
             /** File */
@@ -1340,6 +1392,11 @@ export interface components {
             data: components["schemas"]["SystemInfo"];
             meta: components["schemas"]["Meta"];
         };
+        /** Envelope[TranscriptionResponse] */
+        Envelope_TranscriptionResponse_: {
+            data: components["schemas"]["TranscriptionResponse"];
+            meta: components["schemas"]["Meta"];
+        };
         /** Envelope[dict[str, Any]] */
         Envelope_dict_str__Any__: {
             /** Data */
@@ -1588,7 +1645,7 @@ export interface components {
              * @default chat
              * @enum {string}
              */
-            operation: "chat" | "embeddings";
+            operation: "chat" | "embeddings" | "transcription" | "speech";
             /** Prompt Tokens */
             prompt_tokens: number | null;
             /** Provider Id */
@@ -1898,7 +1955,7 @@ export interface components {
          * ProviderOperation
          * @enum {string}
          */
-        ProviderOperation: "list_models" | "get_capabilities" | "generate" | "stream_generate" | "health_check" | "cancel" | "embed";
+        ProviderOperation: "list_models" | "get_capabilities" | "generate" | "stream_generate" | "health_check" | "cancel" | "embed" | "transcribe" | "synthesize";
         /** ProviderStats */
         ProviderStats: {
             /** Error Rate */
@@ -2048,6 +2105,33 @@ export interface components {
          * @enum {string}
          */
         Sensitivity: "normal" | "sensitive";
+        /** SpeechBody */
+        SpeechBody: {
+            /**
+             * Format
+             * @default wav
+             * @enum {string}
+             */
+            format?: "mp3" | "wav" | "opus" | "flac";
+            /** Input */
+            input: string;
+            /** Model */
+            model?: string | null;
+            /** Provider Id */
+            provider_id?: string | null;
+            /** @default normal */
+            sensitivity?: components["schemas"]["Sensitivity"];
+            /**
+             * Speed
+             * @default 1
+             */
+            speed?: number;
+            /**
+             * Voice
+             * @default alloy
+             */
+            voice?: string;
+        };
         /** StorageArtifact */
         StorageArtifact: {
             /**
@@ -2282,6 +2366,26 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** TranscriptionResponse */
+        TranscriptionResponse: {
+            /** Duration S */
+            duration_s: number | null;
+            /** Language */
+            language: string | null;
+            /** Model */
+            model: string;
+            /** Model Id */
+            model_id: string | null;
+            /** Provider Id */
+            provider_id: string;
+            /** Request Id */
+            request_id: string;
+            route: components["schemas"]["RouteDecision"];
+            /** Text */
+            text: string;
+            timings: components["schemas"]["Timings"];
+            usage: components["schemas"]["TokenUsage"] | null;
+        };
         /** UsageReported */
         UsageReported: {
             /** Request Id */
@@ -2320,6 +2424,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_list_dict_str__Any___"];
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_speech_api_v1_audio_speech_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeechBody"];
+            };
+        };
+        responses: {
+            /** @description The audio. Headers X-OMF-Provider and X-OMF-Model name the route. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "audio/flac": unknown;
+                    "audio/mpeg": unknown;
+                    "audio/ogg": unknown;
+                    "audio/wav": unknown;
+                };
+            };
+            /** @description Default Response */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_transcription_api_v1_audio_transcriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_transcription_api_v1_audio_transcriptions_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_TranscriptionResponse_"];
                 };
             };
             /** @description Default Response */
@@ -3110,7 +3283,7 @@ export interface operations {
         parameters: {
             query?: {
                 window?: number;
-                operation?: "chat" | "embeddings";
+                operation?: "chat" | "embeddings" | "transcription" | "speech";
             };
             header?: never;
             path?: never;

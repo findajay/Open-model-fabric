@@ -18,6 +18,8 @@ export type ToolCall = S["ToolCall"];
 export type InferenceResponse = S["InferenceResponse"];
 export type EmbeddingsRequest = S["EmbeddingsRequest"];
 export type EmbeddingResponse = S["EmbeddingResponse"];
+export type TranscriptionResponse = S["TranscriptionResponse"];
+export type SpeechBody = S["SpeechBody"];
 export type Conversation = S["Conversation"];
 export type ComputeEnvironment = S["ComputeEnvironment"];
 export type ComputeLifecycleOperation = "provision" | "start" | "stop" | "deprovision";
@@ -293,6 +295,35 @@ export class OmfClient {
     this.request<BenchmarkRun>("POST", "/api/v1/benchmarks", body);
   exportBenchmark = async (id: string, format: "csv" | "json"): Promise<Blob> =>
     (await this.raw("GET", `/api/v1/benchmarks/${enc(id)}/export?format=${format}`)).blob();
+
+  // ------------------------------------------------------------------ audio
+
+  /** Speech-to-text. `file` must be wav, mp3, m4a, ogg, webm or flac (type is checked). */
+  transcribe = (file: Blob, options: TranscribeOptions = {}, filename = "audio") => {
+    const form = new FormData();
+    form.set("file", file, filename);
+    for (const [key, value] of Object.entries(options)) {
+      if (value !== undefined && value !== null) form.set(key, String(value));
+    }
+    return this.request<TranscriptionResponse>("POST", "/api/v1/audio/transcriptions", form);
+  };
+
+  /** Text-to-speech. Returns the audio and the provider/model that produced it. */
+  speech = async (body: SpeechBody) => {
+    const response = await this.raw("POST", "/api/v1/audio/speech", body);
+    return {
+      audio: await response.blob(),
+      providerId: response.headers.get("X-OMF-Provider"),
+      model: response.headers.get("X-OMF-Model"),
+    };
+  };
+}
+
+export interface TranscribeOptions {
+  model?: string | null;
+  provider_id?: string | null;
+  language?: string | null;
+  prompt?: string | null;
 }
 
 function enc(value: string): string {

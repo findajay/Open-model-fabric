@@ -102,7 +102,7 @@ async def metrics_summary(
     c: ContainerDep,
     _p: UserDep,
     window: int = 500,
-    operation: Literal["chat", "embeddings"] = "chat",
+    operation: Literal["chat", "embeddings", "transcription", "speech"] = "chat",
 ) -> Envelope[MetricsSummary]:
     """Statistics over the last ``window`` records of one operation (chat by default, so
     embedding latencies do not distort chat latency percentiles)."""

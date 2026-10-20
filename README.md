@@ -17,7 +17,7 @@ point the same configuration at real servers for real models.*
 | Area | What is implemented |
 |---|---|
 | **Inference gateway** | REST + Server-Sent Events streaming with a normalised event contract (`message.started`, `message.delta`, `usage.reported`, `message.completed`, `request.failed`), cancellation (explicit and on client disconnect), correlation ids, structured errors |
-| **Adapters** | Inference: mock (no GPU), Ollama (native API), OpenAI-compatible (vLLM, llama.cpp, TGI, LM Studio, …); chat, streaming, tool calling (passthrough) and embeddings. Compute: local machine, Google Colab notebook (manually managed, ephemeral), and managed lifecycle (opt-in, admin-only) for Docker, Kubernetes, AWS EC2, Google Compute Engine and Azure VMs. Storage: local filesystem, Google Drive, S3-compatible (MinIO tested), Azure Blob. Metadata: SQLite and PostgreSQL (Alembic migrations). Secrets: environment and files. Telemetry: structured logs and optional OpenTelemetry |
+| **Adapters** | Inference: mock (no GPU), Ollama (native API), OpenAI-compatible (vLLM, llama.cpp, TGI, LM Studio, …); chat, streaming, tool calling (passthrough), embeddings, and speech-to-text and text-to-speech (OpenAI-compatible audio API). Compute: local machine, Google Colab notebook (manually managed, ephemeral), and managed lifecycle (opt-in, admin-only) for Docker, Kubernetes, AWS EC2, Google Compute Engine and Azure VMs. Storage: local filesystem, Google Drive, S3-compatible (MinIO tested), Azure Blob. Metadata: SQLite and PostgreSQL (Alembic migrations). Secrets: environment and files. Telemetry: structured logs and optional OpenTelemetry |
 | **Provider registry** | Explicit adapter catalog with schema-validated configuration. Providers can be added, tested, enabled and disabled at runtime without a restart |
 | **Capability registry** | Claims with evidence (`verified` > `provider_reported` > `declared`). Anything undeclared is unsupported, and the UI only offers controls a model declares (e.g. image upload for vision models) |
 | **Routing** | Explicit provider, default provider, preferred provider with fallback, capability-based selection. Fallback must be enabled explicitly, happens only on retryable errors before any output, and sensitive prompts never go to external providers |
@@ -98,10 +98,11 @@ docs                      architecture, ADRs, providers, deployment, security
   `E2E_OPENAI_URL` set exercises real servers.
 * **The notebook's real Hugging Face download/GPU path** is written for Colab but was
   only executed in offline smoke mode (tiny random Qwen2 model on CPU).
-* **Not implemented yet:** audio (declared in the capability vocabulary only); an
-  embeddings UI (the `POST /api/v1/embeddings` endpoint exists); server-side tool
-  execution (by design, tool calls are passed through to the client); an OIDC login UI
-  (OMF validates SSO tokens; clients obtain them).
+* **Audio** (speech-to-text, text-to-speech) is tested against the mock and the
+  OpenAI-compatible emulator only, not a real speech model.
+* **Not implemented yet:** server-side tool execution (by design, tool calls are
+  passed through to the client); an OIDC login UI (OMF validates SSO tokens; clients
+  obtain them).
 * **Compute lifecycle adapters:** only Docker was tested against the real service.
   Kubernetes, Compute Engine and Azure were tested against REST fakes, and EC2 against
   moto.

@@ -29,6 +29,9 @@ Notes:
 - `embeddings` deployments are served by `POST /api/v1/embeddings`. An embeddings-only
   deployment is rejected for chat (`capability_not_supported`) and is not offered in the
   Playground.
+- `audio_input` / `audio_output` deployments are served by `POST /api/v1/audio/transcriptions`
+  and `POST /api/v1/audio/speech`. Only OpenAI-compatible servers (and the mock) support
+  them; declare the capability on the model. Ollama has no audio API.
 - The UI and the router only enable `vision_input` when the *deployment* has a claim for
   it. Ollama reports `vision` per model. On OpenAI-compatible servers it must be declared
   in the provider's `models:` list.
