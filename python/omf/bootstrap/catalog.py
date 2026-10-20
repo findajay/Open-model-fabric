@@ -13,7 +13,18 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from omf.adapters._google import ServiceAccountTokenSource
-from omf.adapters.compute import aws_ec2, azure_vm, colab, docker, gcp_compute, kubernetes, local
+from omf.adapters.compute import (
+    aws_ec2,
+    aws_ecs,
+    azure_container_apps,
+    azure_vm,
+    colab,
+    docker,
+    gcp_cloud_run,
+    gcp_compute,
+    kubernetes,
+    local,
+)
 from omf.adapters.inference import mock, ollama, openai_compatible
 from omf.adapters.storage import azure_blob, google_drive, local_fs, s3
 from omf.core.domain.errors import ConfigurationError, ValidationFailed
@@ -171,7 +182,50 @@ def _azure_vm_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> 
     ctx.egress.check_url_syntax(config.management_url)
     ctx.egress.check_url_syntax(config.authority_url)
     token = azure_vm.AzureClientCredentials(config, ctx.resolve_secret(config.client_secret_ref))
-    return azure_vm.AzureVmComputeAdapter(env_id, config, ctx.egress, token)
+    return azure_vm.AzureVmComputeAdapter(
+        env_id, config, ctx.egress, token, ssh_public_key=_secret(ctx, config.ssh_public_key_ref)
+    )
+
+
+def _aws_ecs_compute(env_id: str, raw: dict[str, Any], ctx: AdapterContext) -> ComputeProvider:
+    config = _parse(aws_ecs.AwsEcsComputeConfig, raw, "aws_ecs compute")
+    if config.endpoint_url:
+        ctx.egress.check_url_syntax(config.endpoint_url)
+    return aws_ecs.AwsEcsComputeAdapter(
+        env_id,
+        config,
+        ctx.egress,
+        access_key=_secret(ctx, config.access_key_id_ref),
+        secret_key=_secret(ctx, config.secret_access_key_ref),
+    )
+
+
+def _gcp_cloud_run_compute(
+    env_id: str, raw: dict[str, Any], ctx: AdapterContext
+) -> ComputeProvider:
+    config = _parse(gcp_cloud_run.GcpCloudRunComputeConfig, raw, "gcp_cloud_run compute")
+    ctx.egress.check_url_syntax(config.api_base)
+    credentials = _secret(ctx, config.credentials_ref)
+    if credentials is None:
+        raise ValidationFailed("gcp_cloud_run needs credentials_ref (service-account JSON)")
+    return gcp_cloud_run.GcpCloudRunComputeAdapter(
+        env_id, config, ctx.egress, ServiceAccountTokenSource(credentials, gcp_cloud_run.SCOPE)
+    )
+
+
+def _azure_container_apps_compute(
+    env_id: str, raw: dict[str, Any], ctx: AdapterContext
+) -> ComputeProvider:
+    config = _parse(
+        azure_container_apps.AzureContainerAppsComputeConfig, raw, "azure_container_apps compute"
+    )
+    ctx.egress.check_url_syntax(config.management_url)
+    ctx.egress.check_url_syntax(config.authority_url)
+    token = azure_vm.AzureClientCredentials(config, ctx.resolve_secret(config.client_secret_ref))
+    secrets = {name: ctx.resolve_secret(ref) for name, ref in config.env_secret_refs.items()}
+    return azure_container_apps.AzureContainerAppsComputeAdapter(
+        env_id, config, ctx.egress, token, secrets=secrets
+    )
 
 
 COMPUTE_ADAPTERS: dict[str, ComputeFactory] = {
@@ -182,6 +236,9 @@ COMPUTE_ADAPTERS: dict[str, ComputeFactory] = {
     aws_ec2.ADAPTER_TYPE: _aws_ec2_compute,
     gcp_compute.ADAPTER_TYPE: _gcp_compute,
     azure_vm.ADAPTER_TYPE: _azure_vm_compute,
+    aws_ecs.ADAPTER_TYPE: _aws_ecs_compute,
+    gcp_cloud_run.ADAPTER_TYPE: _gcp_cloud_run_compute,
+    azure_container_apps.ADAPTER_TYPE: _azure_container_apps_compute,
 }
 
 COMPUTE_CONFIG_MODELS: dict[str, type[BaseModel]] = {
@@ -192,6 +249,9 @@ COMPUTE_CONFIG_MODELS: dict[str, type[BaseModel]] = {
     aws_ec2.ADAPTER_TYPE: aws_ec2.AwsEc2ComputeConfig,
     gcp_compute.ADAPTER_TYPE: gcp_compute.GcpComputeConfig,
     azure_vm.ADAPTER_TYPE: azure_vm.AzureVmComputeConfig,
+    aws_ecs.ADAPTER_TYPE: aws_ecs.AwsEcsComputeConfig,
+    gcp_cloud_run.ADAPTER_TYPE: gcp_cloud_run.GcpCloudRunComputeConfig,
+    azure_container_apps.ADAPTER_TYPE: azure_container_apps.AzureContainerAppsComputeConfig,
 }
 
 
