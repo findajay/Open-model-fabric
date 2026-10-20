@@ -1,0 +1,97 @@
+name: Storage backends
+
+# Runs the storage contract suite (tests/contract) against real storage servers:
+#   * Azurite (Microsoft's Azure Storage emulator), which validates Shared Key and SAS
+#     signatures, through the azure_blob adapter;
+#   * MinIO through the s3 adapter.
+# Kept out of the main CI workflow so pull requests stay fast. Runs on demand, weekly,
+# and when a storage adapter, its tests or this workflow change.
+#
+# MinIO image: minio/minio is no longer published on Docker Hub, so this uses Bitnami's
+# frozen legacy build (bitnamilegacy/minio, MinIO RELEASE.2025-07-23).
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "python/omf/adapters/storage/**"
+      - "tests/contract/**"
+      - "tests/integration/test_azure_blob.py"
+      - ".github/workflows/storage-backends.yml"
+  schedule:
+    - cron: "29 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storage-backends-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  azurite:
+    name: Azurite ${{ matrix.azurite }} (azure_blob)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        azurite: ["3.37.0"]
+    env:
+      OMF_TEST_AZURITE_URL: http://127.0.0.1:10000/devstoreaccount1
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start Azurite (blob service)
+        run: |
+          docker run -d --name azurite -p 10000:10000 \
+            mcr.microsoft.com/azure-storage/azurite:${{ matrix.azurite }} \
+            azurite-blob --blobHost 0.0.0.0 --blobPort 10000
+          # Unauthenticated requests must be refused (403): proves it is up and enforcing auth.
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "$OMF_TEST_AZURITE_URL?comp=list" || true)
+            [ "$code" = "403" ] && break
+            sleep 1
+          done
+          [ "$code" = "403" ]
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --all-extras --python 3.13
+      - name: Contract suite and adapter tests against Azurite
+        run: >-
+          uv run pytest -v -rs
+          tests/contract/test_storage_contract.py tests/integration/test_azure_blob.py
+          -k "azurite or azure"
+      - name: Azurite logs
+        if: always()
+        run: docker logs azurite 2>&1 | tail -50
+
+  minio:
+    name: MinIO ${{ matrix.minio }} (s3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        minio: ["2025.7.23-debian-12-r5"]
+    env:
+      OMF_TEST_MINIO_URL: http://127.0.0.1:9000
+      OMF_TEST_MINIO_ACCESS_KEY: omfminio
+      OMF_TEST_MINIO_SECRET_KEY: omfminio-secret
+    steps:
+      - uses: actions/checkout@v5
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER="$OMF_TEST_MINIO_ACCESS_KEY" \
+            -e MINIO_ROOT_PASSWORD="$OMF_TEST_MINIO_SECRET_KEY" \
+            bitnamilegacy/minio:${{ matrix.minio }}
+          for i in $(seq 1 60); do
+            curl -sf "$OMF_TEST_MINIO_URL/minio/health/live" && break
+            sleep 1
+          done
+          curl -sf "$OMF_TEST_MINIO_URL/minio/health/live"
+          docker exec minio minio --version || true
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --all-extras --python 3.13
+      - name: Contract suite against MinIO
+        run: uv run pytest -v -rs tests/contract/test_storage_contract.py -k minio
+      - name: MinIO logs
+        if: always()
+        run: docker logs minio 2>&1 | tail -50

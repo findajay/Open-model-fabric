@@ -1,0 +1,81 @@
+# Storage backends example: one entry per supported artifact store. Keep the ones you use.
+# Every credential is a secret reference (env: or file:), never a literal value.
+# See docs/providers/storage.md for what each adapter stores and how it was tested.
+profile: production
+environment: production
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+auth:
+  mode: api_key
+  tokens:
+    - name: platform-admin
+      role: admin
+      token_ref: file:/run/secrets/omf_admin_token
+
+security:
+  egress:
+    allow_loopback: false
+    allow_private_networks: true      # MinIO usually runs on the private network
+  secret_dirs: ["/run/secrets"]
+
+metadata:
+  url_ref: env:OMF_DATABASE_URL
+
+compute:
+  - id: local
+    adapter: local
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: "${OMF_DATA_DIR:-/data}/artifacts"
+
+  # Azure Blob Storage with the storage account key (Shared Key signing).
+  - id: azure-artifacts
+    adapter: azure_blob
+    config:
+      account_name: omfartifacts
+      container: models
+      prefix: omf/
+      account_key_ref: env:AZURE_STORAGE_KEY
+      block_size_mb: 8
+
+  # Azure Blob Storage with a service principal (Entra ID); grant it
+  # "Storage Blob Data Contributor" on the container.
+  - id: azure-entra
+    adapter: azure_blob
+    config:
+      account_name: omfartifacts
+      container: experiments
+      tenant_id: 00000000-0000-0000-0000-000000000000
+      client_id: 00000000-0000-0000-0000-000000000000
+      client_secret_ref: env:AZURE_CLIENT_SECRET
+
+  # Azure Blob Storage with a SAS token (container- or account-level, read/write/list/delete).
+  # - id: azure-sas
+  #   adapter: azure_blob
+  #   config: {account_name: omfartifacts, container: models, sas_token_ref: env:AZURE_SAS}
+
+  # MinIO (or any S3-compatible server) through the s3 adapter.
+  - id: minio
+    adapter: s3
+    config:
+      bucket: omf-artifacts
+      prefix: omf/
+      region: us-east-1
+      endpoint_url: http://minio.internal.example.com:9000
+      force_path_style: true
+      access_key_id_ref: env:MINIO_ACCESS_KEY
+      secret_access_key_ref: env:MINIO_SECRET_KEY
+
+providers:
+  - id: mock
+    adapter_type: mock
+
+inference:
+  default_provider: mock
