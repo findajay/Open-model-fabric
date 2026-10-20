@@ -256,6 +256,40 @@ The tests found no difference between the emulators and the real engines. They c
 behaviour, not byte-for-byte equality of payloads. These engines could not be run in the
 development sandbox, because its proxy blocks Hugging Face and the Ollama registry.
 
+## Storage backends: Azure Blob and MinIO
+
+**Implemented.**
+* An `azure_blob` adapter using REST over httpx, with no Azure SDK.
+* Authentication: Shared Key, SAS token, or an Entra ID service principal.
+* Block-blob uploads for large files.
+* Metadata: checksums and versions are stored in blob metadata, and user metadata as
+  base64 JSON.
+* The egress policy is checked before the first request, and redirects are never
+  followed.
+* A storage provider whose secret is missing is registered as unavailable; startup
+  still succeeds.
+* Registered in the catalog. `STORAGE_CONFIG_MODELS` is shared with the profile tests.
+* `configs/storage-backends.example.yaml` gives one profile with every storage adapter.
+
+**Tested against real servers.**
+* Azurite 3.37.0, locally and in the `Storage backends` workflow:
+  * the full storage contract suite;
+  * a real account SAS, plus a tampered SAS that is rejected;
+  * a wrong account key, which is rejected; this proves Azurite verifies signatures;
+  * upload, download, list and delete through the HTTP API.
+* MinIO, in CI: the S3 adapter's contract suite. The image is
+  `bitnamilegacy/minio:2025.7.23-debian-12-r5`, because `minio/minio` is no longer
+  published on Docker Hub.
+* MinIO was not run locally, because the sandbox's anonymous Docker Hub pulls were
+  rate-limited (HTTP 429).
+
+**Shared Key format.** It follows azure-sdk-for-python's `SharedKeyCredentialPolicy`,
+fetched from GitHub; learn.microsoft.com was blocked by the sandbox proxy. The header
+collation tables were ported and compared value for value with the SDK source. A
+hand-derived golden string-to-sign is in `tests/integration/test_azure_blob.py`.
+
+**Not tested** against real Azure Storage accounts.
+
 ## Remaining work (not implemented)
 
 * Audio input and output. These capabilities exist in the vocabulary, the catalog and
@@ -265,8 +299,8 @@ development sandbox, because its proxy blocks Hugging Face and the Ollama regist
 * Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
   provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters
   against real clusters and accounts.
-* Additional storage adapters: Azure Blob, and a native MinIO adapter (MinIO works today
-  through the S3 adapter's `endpoint_url`, but this is untested).
+* Runs of the storage adapters against real cloud accounts (Google Drive, AWS S3, Azure
+  Storage). They are tested against fakes and emulators only.
 * SSO/OIDC, token rotation, multi-tenancy beyond per-token conversation ownership, and
   rate limiting.
 * Cancellation across replicas (in-flight state is per process), and multi-replica
