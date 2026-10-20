@@ -23,9 +23,11 @@ another team owns. An API-level bug or a double click must never launch two GPU 
   that has the configured name but lacks the labels. They never adopt it silently.
   - EC2 has one exception: an operator may designate an existing instance
     (`instance_id`). OMF may start and stop it but never terminates it.
-  - Azure VMs are created outside OMF (they need a NIC, VNet and disks), so the Azure
-    adapter implements only `start` and `stop`. `stop` always **deallocates**, because a
-    VM that is only powered off is still billed.
+  - Azure VMs follow the same model. A VM without OMF tags is designated: start and
+    stop only. With provisioning settings, OMF creates a tagged NIC and VM in an
+    existing subnet; the OS disk and NIC use `deleteOption: Delete`, so deprovision
+    removes them. `stop` always **deallocates**, because a VM that is only powered off
+    is still billed.
 - **One operation at a time** per environment (an asyncio lock in the process).
   Provisioning is idempotent: it looks for the labelled resource first.
 - **Bounded waiting.** Operations return when the backend has accepted them. Callers can
@@ -45,9 +47,9 @@ another team owns. An API-level bug or a double click must never launch two GPU 
   operations, or put them behind a queue, if this matters.
 - Tests:
   - Docker is tested against a real Docker Engine.
-  - Kubernetes, Compute Engine and Azure are tested against in-memory fakes of their
-    REST endpoints.
-  - EC2 is tested against moto.
+  - Kubernetes, Compute Engine, Cloud Run, Azure VMs and Container Apps are tested
+    against in-memory fakes of their REST endpoints.
+  - EC2 and ECS are tested against moto.
   - None of them has been run against a real cluster or cloud account. See
     `docs/implementation-status.md`.
 
@@ -60,3 +62,29 @@ another team owns. An API-level bug or a double click must never launch two GPU 
   already uses.
 - **Adopting resources by name:** this is convenient, but one typo could stop someone
   else's production workload. It was rejected.
+
+## Addendum: managed container services
+
+`aws_ecs`, `gcp_cloud_run` and `azure_container_apps` follow the same rules: the opt-in,
+ownership tags or labels, refusing foreign resources, and the per-environment lock. What
+"start" and "stop" mean depends on the platform:
+
+| Adapter | provision | start / stop | deprovision |
+|---|---|---|---|
+| `aws_ecs` | Tagged task definition + service, `desiredCount: 0` | `desiredCount` N / 0 | Delete the service, deregister the task definition |
+| `gcp_cloud_run` | Labelled v2 service, service-level `scaling.minInstanceCount: 0` | `minInstanceCount` N / 0 (**scale to zero**: still serves cold starts) | Delete the service |
+| `azure_container_apps` | Tagged app (PUT) in an existing environment, `minReplicas` as configured | Azure's `start` / `stop` actions (a stopped app runs no replicas) | Delete the app |
+
+Container Apps uses the native actions, not `minReplicas` changes. `minReplicas: 0`
+still cold-starts on requests, and rewriting the app with a PUT would require resending
+secret values that a GET does not return.
+
+Pinned API versions:
+- Cloud Run Admin API v2. Field names were checked against its discovery document
+  (revision 20261009).
+- `Microsoft.App/containerApps` `2025-01-01`.
+- `Microsoft.Compute/virtualMachines` `2024-07-01`.
+- `Microsoft.Network/networkInterfaces` `2024-07-01`.
+
+The Azure versions and fields were checked against the Azure REST API specs. None of
+these adapters has been run against a real account.

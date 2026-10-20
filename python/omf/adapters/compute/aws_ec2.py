@@ -17,11 +17,11 @@ container. Resources (vCPUs, memory, GPU model and memory) come from
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 from pydantic import Field, model_validator
 
+from omf.adapters.compute._aws import boto_client, call
 from omf.adapters.compute._managed import (
     ENVIRONMENT_LABEL,
     OWNER_LABEL,
@@ -30,7 +30,7 @@ from omf.adapters.compute._managed import (
     ManagedComputeConfig,
     owned,
 )
-from omf.core.domain.errors import ComputeError, ConfigurationError, Conflict
+from omf.core.domain.errors import ComputeError, Conflict
 from omf.core.domain.models import ComputeResources, ComputeState, GpuInfo
 from omf.core.ports.secrets import SecretRefStr, SecretValue
 from omf.core.security.egress import EgressPolicy
@@ -93,44 +93,18 @@ class AwsEc2ComputeAdapter(ManagedComputeAdapter):
         super().__init__(environment_id, config, egress)
         self.cfg = config
         self.ephemeral = config.spot
-        if client is None:
-            try:
-                import boto3
-            except ImportError as exc:  # pragma: no cover - optional extra
-                raise ConfigurationError(
-                    "the aws_ec2 compute adapter needs boto3 (pip install 'open-model-fabric[s3]')"
-                ) from exc
-            kwargs: dict[str, Any] = {
-                "region_name": config.region,
-                "endpoint_url": config.endpoint_url,
-            }
-            if access_key and secret_key:
-                kwargs.update(
-                    aws_access_key_id=access_key.reveal(), aws_secret_access_key=secret_key.reveal()
-                )
-            client = boto3.client("ec2", **kwargs)
-        self._ec2 = client
+        self._ec2 = client or boto_client(
+            "ec2",
+            region=config.region,
+            endpoint_url=config.endpoint_url,
+            access_key=access_key,
+            secret_key=secret_key,
+            adapter=ADAPTER_TYPE,
+        )
         self._types: dict[str, ComputeResources] = {}
 
     async def _call(self, name: str, **kwargs: Any) -> dict[str, Any]:
-        def run() -> dict[str, Any]:
-            try:
-                return dict(getattr(self._ec2, name)(**kwargs))
-            except Exception as exc:
-                code = getattr(exc, "response", {}).get("Error", {}).get("Code", type(exc).__name__)
-                message = getattr(exc, "response", {}).get("Error", {}).get("Message", str(exc))
-                raise ComputeError(
-                    f"EC2 {name} failed: {code}: {str(message)[:300]}",
-                    details={"aws_error": code},
-                    retryable=code
-                    in (
-                        "RequestLimitExceeded",
-                        "InsufficientInstanceCapacity",
-                        "ServiceUnavailable",
-                    ),
-                ) from exc
-
-        return await asyncio.to_thread(run)
+        return await call(self._ec2, "EC2", name, **kwargs)
 
     # ------------------------------------------------------------------ lookup
 

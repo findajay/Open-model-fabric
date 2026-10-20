@@ -33,6 +33,7 @@ from omf.adapters.compute._managed import (
     ManagedComputeAdapter,
     ManagedComputeConfig,
     owned,
+    pinned_image,
 )
 from omf.adapters.compute._rest import RestClient
 from omf.core.domain.errors import ComputeError, Conflict
@@ -74,12 +75,7 @@ class DockerComputeConfig(ManagedComputeConfig):
     @field_validator("image")
     @classmethod
     def _pinned(cls, v: str) -> str:
-        last = v.rsplit("/", 1)[-1]
-        if "@sha256:" not in v and ":" not in last:
-            raise ValueError("image must be pinned to a tag or digest (e.g. ollama/ollama:0.40.6)")
-        if last.endswith(":latest"):
-            raise ValueError("':latest' is not reproducible; pin a version tag or digest")
-        return v
+        return pinned_image(v)
 
     @field_validator("volumes")
     @classmethod

@@ -17,7 +17,7 @@ point the same configuration at real servers for real models.*
 | Area | What is implemented |
 |---|---|
 | **Inference gateway** | REST + Server-Sent Events streaming with a normalised event contract (`message.started`, `message.delta`, `usage.reported`, `message.completed`, `request.failed`), cancellation (explicit and on client disconnect), correlation ids, structured errors |
-| **Adapters** | Inference: mock (no GPU), Ollama (native API), OpenAI-compatible (vLLM, llama.cpp, TGI, LM Studio, …); chat, streaming, tool calling (passthrough) and embeddings. Compute: local machine, Google Colab notebook (manually managed, ephemeral), and managed lifecycle (opt-in, admin-only) for Docker, Kubernetes, AWS EC2, Google Compute Engine and Azure VMs. Storage: local filesystem, Google Drive, S3-compatible. Metadata: SQLite and PostgreSQL (Alembic migrations). Secrets: environment and files. Telemetry: structured logs and optional OpenTelemetry |
+| **Adapters** | Inference: mock (no GPU), Ollama (native API), OpenAI-compatible (vLLM, llama.cpp, TGI, LM Studio, …); chat, streaming, tool calling (passthrough) and embeddings. Compute: local machine, Google Colab notebook (manually managed, ephemeral), and managed lifecycle (opt-in, admin-only) for Docker, Kubernetes, AWS EC2 and ECS, Google Compute Engine and Cloud Run, Azure VMs and Container Apps. Storage: local filesystem, Google Drive, S3-compatible. Metadata: SQLite and PostgreSQL (Alembic migrations). Secrets: environment and files. Telemetry: structured logs and optional OpenTelemetry |
 | **Provider registry** | Explicit adapter catalog with schema-validated configuration. Providers can be added, tested, enabled and disabled at runtime without a restart |
 | **Capability registry** | Claims with evidence (`verified` > `provider_reported` > `declared`). Anything undeclared is unsupported, and the UI only offers controls a model declares (e.g. image upload for vision models) |
 | **Routing** | Explicit provider, default provider, preferred provider with fallback, capability-based selection. Fallback must be enabled explicitly, happens only on retryable errors before any output, and sensitive prompts never go to external providers |
@@ -51,7 +51,7 @@ flowchart LR
   R --> S["Application services<br/>routing · inference · model registry ·<br/>health · benchmarks · settings"]
   S --> P{{Ports}}
   P --> I["Inference adapters<br/>mock · Ollama · OpenAI-compatible"]
-  P --> C["Compute adapters<br/>local · Colab (manual) · Docker · Kubernetes · EC2 · GCE · Azure"]
+  P --> C["Compute adapters<br/>local · Colab (manual) · Docker · Kubernetes · EC2 · ECS · GCE · Cloud Run · Azure VM · Container Apps"]
   P --> St["Storage adapters<br/>local FS · Google Drive · S3"]
   P --> M["Metadata<br/>SQLite · PostgreSQL"]
   P --> X["Secrets · Telemetry"]
@@ -103,8 +103,8 @@ docs                      architecture, ADRs, providers, deployment, security
   execution (by design, tool calls are passed through to the client);
   SSO/OIDC; rate limiting.
 * **Compute lifecycle adapters:** only Docker was tested against the real service.
-  Kubernetes, Compute Engine and Azure were tested against REST fakes, and EC2 against
-  moto.
+  Kubernetes, Compute Engine, Cloud Run, Azure VMs and Container Apps were tested
+  against REST fakes, and EC2 and ECS against moto.
 
 See [docs/implementation-status.md](docs/implementation-status.md) for the phase-by-phase
 report.

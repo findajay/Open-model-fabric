@@ -256,15 +256,51 @@ The tests found no difference between the emulators and the real engines. They c
 behaviour, not byte-for-byte equality of payloads. These engines could not be run in the
 development sandbox, because its proxy blocks Hugging Face and the Ollama registry.
 
+## Phase 9 — Managed container services and Azure VM provisioning
+
+**Implemented.**
+* `aws_ecs`: a tagged task definition and service, desired count 0..N; Secrets Manager or
+  SSM ARNs (`env_secret_arn_refs`) for secrets; GPU resource requirements on EC2
+  capacity.
+* `gcp_cloud_run`: a labelled v2 service. Start and stop set the service-level
+  `scaling.minInstanceCount`; stop means scale to zero. Optional `nvidia-l4` GPU and
+  Secret Manager env vars (`env_secret_manager_refs`). Long-running operations are
+  polled.
+* `azure_container_apps`: a tagged app in an existing environment, with native start and
+  stop actions, an optional GPU workload profile, and secret env values stored as app
+  secrets.
+* `azure_vm`: provisioning creates a NIC in an existing subnet and a VM with SSH-key-only
+  login and cloud-init. Deprovision deletes the VM, NIC and disk (`deleteOption:
+  Delete`). VMs without tags stay designated: start and stop only.
+* A shared AWS helper (`_aws.py`, now also used by EC2) and a shared `pinned_image`
+  validator.
+
+**Verified API facts.**
+* The Cloud Run v2 field names (`scaling.minInstanceCount`, `nodeSelector.accelerator`,
+  the `nvidia.com/gpu` limit of exactly `"1"`, `cpuIdle`, `valueSource.secretKeyRef`, and
+  the operation shape) were checked against Google's discovery document.
+* The Azure api-versions and fields were checked against the Azure REST API specs:
+  `Microsoft.App/containerApps` `2025-01-01` with its `start` and `stop` actions;
+  `virtualMachines` and `networkInterfaces` `2024-07-01`, including `deleteOption`.
+* moto's ECS validates that subnets exist, so the tests create a real VPC and subnet.
+
+**Tests.** `tests/integration/test_compute_services.py` (9 tests) covers:
+* ECS against moto;
+* Cloud Run and Azure against REST fakes;
+* lifecycle, refusing foreign resources, request bodies (GPU, secrets, cloud-init), the
+  NIC wait, designated VMs, orphan NIC cleanup, and config validation.
+
+Removing the ECS ownership check makes these tests fail. None of these adapters has been
+run against a real cloud account.
+
 ## Remaining work (not implemented)
 
 * Audio input and output. These capabilities exist in the vocabulary, the catalog and
   the UI badges only.
 * Server-side tool execution. This is deliberately out of scope; see ADR-0013.
 * A UI for embeddings: the endpoint and SDK exist, but no screen calls them.
-* Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
-  provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters
-  against real clusters and accounts.
+* Runs of the Kubernetes and cloud compute adapters against real clusters and accounts;
+  only Docker has been run for real.
 * Additional storage adapters: Azure Blob, and a native MinIO adapter (MinIO works today
   through the S3 adapter's `endpoint_url`, but this is untested).
 * SSO/OIDC, token rotation, multi-tenancy beyond per-token conversation ownership, and

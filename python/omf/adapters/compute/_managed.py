@@ -225,3 +225,13 @@ class ManagedComputeAdapter(ComputeProvider):
 def owned(labels: dict[str, str] | None, environment_id: str) -> bool:
     labels = labels or {}
     return labels.get(OWNER_LABEL) == "true" and labels.get(ENVIRONMENT_LABEL) == environment_id
+
+
+def pinned_image(image: str) -> str:
+    """Validate that a container image is pinned to a version tag or digest."""
+    last = image.rsplit("/", 1)[-1]
+    if "@sha256:" not in image and ":" not in last:
+        raise ValueError("image must be pinned to a tag or digest (e.g. ollama/ollama:0.40.6)")
+    if last.endswith(":latest"):
+        raise ValueError("':latest' is not reproducible; pin a version tag or digest")
+    return image
