@@ -174,6 +174,11 @@ class PermissionDenied(OMFError):
     code = "permission_denied"
 
 
+class RateLimited(OMFError):
+    code = "rate_limited"
+    retryable = True
+
+
 class LifecycleDisabled(PermissionDenied):
     """The adapter could change the environment, but the operator has not allowed it."""
 

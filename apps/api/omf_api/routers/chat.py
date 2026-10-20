@@ -85,4 +85,4 @@ async def cancel_request(request_id: str, c: ContainerDep, p: UserDep) -> Envelo
 
 @router.get("/requests", summary="Ids of in-flight requests")
 async def inflight(c: ContainerDep, p: UserDep) -> Envelope[list[str]]:
-    return ok(c.inference.inflight(owner=p.name, is_admin=p.role == "admin"))
+    return ok(await c.inference.inflight(owner=p.name, is_admin=p.role == "admin"))

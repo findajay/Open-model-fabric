@@ -93,3 +93,19 @@ inference_records = Table(
     Column("document", Text, nullable=False),
     Column("created_at", String(40), nullable=False, index=True),
 )
+
+inflight_requests = Table(
+    "inflight_requests",
+    metadata,
+    Column("request_id", String(100), primary_key=True),
+    Column("owner", String(130)),
+    Column("replica", String(64), nullable=False),
+    Column("started_at", String(40), nullable=False, index=True),
+)
+
+cancel_requests = Table(
+    "cancel_requests",
+    metadata,
+    Column("request_id", String(100), primary_key=True),
+    Column("requested_at", String(40), nullable=False),
+)

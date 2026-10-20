@@ -10,6 +10,7 @@ server:
   cors_allow_origins: ["https://omf.example.com"]
   max_request_bytes: 4194304
   serve_web_dir: /app/web
+  cancellation: shared                   # cancels reach any replica (PostgreSQL metadata)
 
 auth:
   mode: api_key
@@ -20,6 +21,15 @@ auth:
     - name: app-backend
       role: user
       token_ref: env:OMF_APP_TOKEN
+      # expires_at: "2027-01-31T00:00:00Z"   # rotation deadline; add the new key first
+  # Single sign-on for people: accept JWTs from your OIDC provider (Keycloak, Entra ID,
+  # Okta, Auth0, Google...). Needs the `oidc` extra (included in the container image).
+  # oidc:
+  #   issuer: https://login.example.com/realms/omf
+  #   audience: omf-api
+  #   role_claim: realm_access.roles
+  #   admin_values: [omf-admin]
+  #   user_values: [omf-user]
 
 security:
   egress:
@@ -28,6 +38,9 @@ security:
     allowed_hosts: ["*.internal.example.com"]
   log_prompt_content: false
   secret_dirs: ["/run/secrets"]
+  rate_limits:                           # per principal, per replica
+    requests_per_minute: 600
+    inference_per_minute: 60
 
 metadata:
   url_ref: env:OMF_DATABASE_URL         # postgresql+psycopg://user:pass@host:5432/omf

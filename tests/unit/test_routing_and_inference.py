@@ -302,7 +302,7 @@ async def test_service_level_cancellation_closes_stream(tmp_path: Path) -> None:
             assert await c.inference.cancel(cmd.request_id)
     assert events[-1].event == StreamEventType.FAILED
     assert events[-1].data.error.code == "request_cancelled"  # type: ignore[union-attr]
-    assert c.inference.inflight() == []
+    assert await c.inference.inflight() == []
     records = await c.metadata.recent_records()
     assert records[0].status.value == "cancelled"
     conversation = await c.metadata.get_conversation(cmd.conversation_id)  # type: ignore[arg-type]
@@ -320,7 +320,7 @@ async def test_closing_the_iterator_cancels_the_request(tmp_path: Path) -> None:
             break
     await stream.aclose()  # what Starlette does when the HTTP client disconnects
     await asyncio.sleep(0.05)
-    assert c.inference.inflight() == []
+    assert await c.inference.inflight() == []
     assert (await c.metadata.recent_records())[0].status.value == "cancelled"
     await c.aclose()
 

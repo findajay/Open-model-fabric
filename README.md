@@ -25,7 +25,7 @@ point the same configuration at real servers for real models.*
 | **Benchmarks** | Versioned prompt datasets, cold vs warm measurements, TTFT, latency, tokens/s, error rates, hardware/quantization fingerprints, comparability warnings, CSV/JSON export (also to Google Drive) |
 | **Web app** | React + TypeScript + Vite + Tailwind + shadcn/ui-style components: Dashboard, AI Playground, Model Registry, Providers, Infrastructure, Benchmark Lab, Settings |
 | **Colab lab** | `notebooks/colab_model_lab.ipynb`: hardware and memory detection, optional Drive mount, pinned-revision safetensors download, checksums, TTFT and tokens/s measurement, CSV/JSON export, clean teardown; runs standalone |
-| **Security** | Backend-only secrets referenced as `env:`/`file:`, API-key auth with user/admin roles, SSRF egress policy, request limits, upload validation, CORS allowlist, audit log, no prompt text in telemetry by default |
+| **Security** | Backend-only secrets referenced as `env:`/`file:`, API keys with expiry and no-restart rotation, OIDC single sign-on (JWT validation), user/admin roles, per-principal rate limits, SSRF egress policy, request limits, upload validation, CORS allowlist, audit log, no prompt text in telemetry by default |
 | **Developer experience** | `make dev` (no GPU), Docker/Compose/Kubernetes, generated OpenAPI contract and TypeScript SDK, strict typing (mypy, tsc), lint, unit/contract/integration/e2e tests, CI, security scanning |
 
 ## Quick start (no GPU, no cloud account)
@@ -100,8 +100,8 @@ docs                      architecture, ADRs, providers, deployment, security
   only executed in offline smoke mode (tiny random Qwen2 model on CPU).
 * **Not implemented yet:** audio (declared in the capability vocabulary only); an
   embeddings UI (the `POST /api/v1/embeddings` endpoint exists); server-side tool
-  execution (by design, tool calls are passed through to the client);
-  SSO/OIDC; rate limiting.
+  execution (by design, tool calls are passed through to the client); an OIDC login UI
+  (OMF validates SSO tokens; clients obtain them).
 * **Compute lifecycle adapters:** only Docker was tested against the real service.
   Kubernetes, Compute Engine and Azure were tested against REST fakes, and EC2 against
   moto.

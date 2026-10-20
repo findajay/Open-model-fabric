@@ -45,6 +45,7 @@ STATUS_BY_TYPE: list[tuple[type[e.OMFError], int]] = [
     (e.PermissionDenied, 403),
     (e.ComputeError, 502),
     (e.AuthenticationRequired, 401),
+    (e.RateLimited, 429),
     (e.SecretNotFound, 500),
     (e.ConfigurationError, 500),
 ]
@@ -97,6 +98,8 @@ def install_error_handlers(app: FastAPI) -> None:
         if status >= 500:
             log.warning("request failed: %s %s", exc.code, exc.message)
         headers = {"WWW-Authenticate": "Bearer"} if status == 401 else None
+        if status == 429:
+            headers = {"Retry-After": str(exc.details.get("retry_after_s", 1))}
         return error_response(
             status,
             exc.code,

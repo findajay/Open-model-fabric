@@ -30,7 +30,7 @@ from omf_api.routers import (
     providers,
     system,
 )
-from omf_api.security import Authenticator
+from omf_api.security import Authenticator, RateLimiter
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +69,8 @@ def create_app(
         owned = container is None
         c = container or await build_container(cfg)
         app.state.container = c
-        app.state.authenticator = Authenticator(cfg.auth, c.secrets)
+        app.state.authenticator = Authenticator(cfg.auth, c.secrets, cfg.security.egress)
+        app.state.rate_limiter = RateLimiter(cfg.security.rate_limits)
         await c.start(background=start_background)
         log.info(
             "Open Model Fabric %s started (profile=%s, providers=%s)",
@@ -80,6 +81,7 @@ def create_app(
         try:
             yield
         finally:
+            await app.state.authenticator.aclose()
             if owned:
                 await c.aclose()
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -66,23 +67,82 @@ class ServerConfig(_Strict):
     max_upload_bytes: int = Field(default=512 * 1024 * 1024, ge=1024)
     serve_web_dir: str | None = None
     """If set, serve the built React app (apps/web/dist) from this directory."""
+    cancellation: Literal["local", "shared"] = "local"
+    """``shared`` records in-flight requests and cancel requests in the metadata database,
+    so a cancel reaches the replica serving the stream (use with PostgreSQL)."""
 
 
 class ApiToken(_Strict):
     name: str = Field(pattern=SLUG_PATTERN)
     role: Literal["admin", "user"]
     token_ref: SecretRefStr
+    expires_at: datetime | None = None
+    """After this instant the token no longer authenticates (rotation deadline)."""
+
+
+JwtAlgorithm = Literal[
+    "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "EdDSA"
+]
+
+
+class OidcConfig(_Strict):
+    """Single sign-on: accept JWT access/ID tokens issued by an OpenID Connect provider."""
+
+    issuer: str = Field(examples=["https://login.example.com/realms/omf"])
+    audience: str | list[str]
+    jwks_url: str | None = None
+    """Defaults to ``jwks_uri`` from ``{issuer}/.well-known/openid-configuration``."""
+    algorithms: list[JwtAlgorithm] = Field(
+        default_factory=lambda: list[JwtAlgorithm](["RS256", "ES256"]), min_length=1
+    )
+    name_claim: str = "preferred_username"
+    """Claim used as the principal name (falls back to ``sub``); prefixed with ``sso:``."""
+    role_claim: str = "roles"
+    """Dotted path to a string or list claim, e.g. ``realm_access.roles`` (Keycloak)."""
+    admin_values: list[str] = Field(default_factory=lambda: ["omf-admin"])
+    user_values: list[str] = Field(default_factory=list)
+    """Role values granting ``user``; empty means every valid token is a user."""
+    leeway_s: int = Field(default=30, ge=0, le=300)
+    jwks_cache_s: int = Field(default=600, ge=10, le=86_400)
+
+    @field_validator("issuer", "jwks_url")
+    @classmethod
+    def _https(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        host = re.sub(r"^https?://", "", v).split("/")[0].split(":")[0]
+        if not v.startswith("https://") and host not in ("localhost", "127.0.0.1", "::1"):
+            raise ValueError("OIDC URLs must use https (http only for localhost)")
+        return v.rstrip("/")
 
 
 class AuthConfig(_Strict):
     mode: Literal["none", "api_key"] = "api_key"
+    """``api_key``: every API call needs a bearer token (an API key, or an OIDC JWT when
+    ``oidc`` is configured). ``none``: development on localhost only."""
     tokens: list[ApiToken] = Field(default_factory=list)
+    oidc: OidcConfig | None = None
+    token_reload_s: float = Field(default=60.0, ge=0, le=86_400)
+    """Re-read token secrets this often, so rotated secret files take effect without a
+    restart (0 disables)."""
+
+
+class RateLimitConfig(_Strict):
+    """Per-principal token buckets (per API process; see docs/security)."""
+
+    requests_per_minute: int | None = Field(default=None, ge=1, le=1_000_000)
+    """All authenticated API calls."""
+    inference_per_minute: int | None = Field(default=None, ge=1, le=1_000_000)
+    """Chat, embeddings and audio calls (counted in addition to the general limit)."""
+    burst: int | None = Field(default=None, ge=1, le=1_000_000)
+    """Bucket size; defaults to the per-minute limit."""
 
 
 class SecurityConfig(_Strict):
     egress: EgressPolicy = Field(default_factory=EgressPolicy)
     log_prompt_content: bool = False
     secret_dirs: list[str] = Field(default_factory=lambda: ["/run/secrets"])
+    rate_limits: RateLimitConfig = Field(default_factory=RateLimitConfig)
     allowed_upload_content_types: list[str] = Field(
         default_factory=lambda: [
             "application/octet-stream",
@@ -225,9 +285,10 @@ class AppConfig(_Strict):
                 "routing.fallback_provider_ids requires allow_cross_provider_fallback: true"
             )
         if self.environment == "production":
-            if self.auth.mode != "api_key" or not self.auth.tokens:
+            if self.auth.mode != "api_key" or not (self.auth.tokens or self.auth.oidc):
                 raise ValueError(
-                    "production profiles must use auth.mode=api_key with at least one token"
+                    "production profiles must use auth.mode=api_key with at least one token "
+                    "or an oidc section"
                 )
             if "*" in self.server.cors_allow_origins:
                 raise ValueError("production profiles must not allow CORS from '*'")

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -422,3 +423,84 @@ class SqlMetadataStore(MetadataStore):
             )
         )
         return [InferenceRecord.model_validate_json(r) for r in rows]
+
+    # ------------------------------------------------------------------ coordination
+
+    async def register_inflight(self, request_id: str, owner: str | None, replica: str) -> None:
+        values = {"owner": owner, "replica": replica, "started_at": utcnow().isoformat()}
+        await self._run(
+            lambda c: self._upsert(c, t.inflight_requests, "request_id", request_id, values),
+            write=True,
+        )
+
+    async def unregister_inflight(self, request_id: str) -> None:
+        def work(c: Connection) -> None:
+            c.execute(
+                delete(t.inflight_requests).where(t.inflight_requests.c.request_id == request_id)
+            )
+            c.execute(delete(t.cancel_requests).where(t.cancel_requests.c.request_id == request_id))
+
+        await self._run(work, write=True)
+
+    async def inflight_owner(self, request_id: str) -> tuple[bool, str | None]:
+        row = await self._run(
+            lambda c: c.execute(
+                select(t.inflight_requests.c.owner).where(
+                    t.inflight_requests.c.request_id == request_id
+                )
+            ).first()
+        )
+        return (row is not None, row[0] if row is not None else None)
+
+    async def list_inflight(self, owner: str | None = None) -> list[str]:
+        query = select(t.inflight_requests.c.request_id)
+        if owner is not None:
+            query = query.where(t.inflight_requests.c.owner == owner)
+        return list(await self._run(lambda c: c.execute(query).scalars().all()))
+
+    async def request_cancel(self, request_id: str) -> None:
+        values = {"requested_at": utcnow().isoformat()}
+        await self._run(
+            lambda c: self._upsert(c, t.cancel_requests, "request_id", request_id, values),
+            write=True,
+        )
+
+    async def take_cancels(self, request_ids: list[str]) -> list[str]:
+        if not request_ids:
+            return []
+        table = t.cancel_requests
+
+        def work(c: Connection) -> list[str]:
+            found = list(
+                c.execute(
+                    select(table.c.request_id).where(table.c.request_id.in_(request_ids))
+                ).scalars()
+            )
+            if found:
+                c.execute(delete(table).where(table.c.request_id.in_(found)))
+            return found
+
+        # Only rows that exist are deleted, so this is a read unless a cancel is pending.
+        return await self._run(work, write=True)
+
+    async def prune_inflight(self, older_than_s: float) -> int:
+        cutoff = (utcnow() - timedelta(seconds=older_than_s)).isoformat()
+
+        def work(c: Connection) -> int:
+            stale = list(
+                c.execute(
+                    select(t.inflight_requests.c.request_id).where(
+                        t.inflight_requests.c.started_at < cutoff
+                    )
+                ).scalars()
+            )
+            if stale:
+                c.execute(
+                    delete(t.inflight_requests).where(t.inflight_requests.c.request_id.in_(stale))
+                )
+                c.execute(
+                    delete(t.cancel_requests).where(t.cancel_requests.c.request_id.in_(stale))
+                )
+            return len(stale)
+
+        return await self._run(work, write=True)

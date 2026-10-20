@@ -256,6 +256,39 @@ The tests found no difference between the emulators and the real engines. They c
 behaviour, not byte-for-byte equality of payloads. These engines could not be run in the
 development sandbox, because its proxy blocks Hugging Face and the Ollama registry.
 
+## Phase 9 — SSO, key rotation, rate limits, shared cancellation
+
+**Implemented** (ADR-0014):
+* **OIDC bearer-token validation:**
+  * JWKS discovery through the egress policy, with caching;
+  * a refresh when a token names an unknown key id;
+  * `iss`/`aud`/`exp` checks and an algorithm allowlist;
+  * role mapping from a dotted claim path.
+* **API keys:** `expires_at`, overlapping entries for rotation, and secrets re-read
+  every `auth.token_reload_s`.
+* **Rate limits:** per-principal token buckets for all calls and for inference, returning
+  429 with `Retry-After`.
+* **Shared cancellation** (`server.cancellation: shared`, migration 0003): a cancel sent
+  to any replica stops the stream on the replica serving it.
+* **Real-engine tool-calling tests:** a round trip and a streamed call against Ollama and
+  llama.cpp, which runs with `--jinja`.
+
+**Tests.**
+* `tests/integration/test_auth.py` (10 tests), against a real loopback identity provider
+  with generated RSA keys:
+  * role mapping;
+  * expired, wrong-audience, wrong-issuer and unknown-key tokens;
+  * algorithm-confusion attacks (HS256 signed with the public key, and `alg: none`);
+  * provider key rotation;
+  * API-key rotation on disk and expiry;
+  * rate limits per principal and per kind.
+* `tests/integration/test_shared_cancellation.py`: two containers share one database.
+  Cancelling through replica B stops replica A's stream, and another user cannot cancel
+  it. Disabling the poller makes this test fail.
+* A coordination contract test in the metadata suite, which runs on PostgreSQL in CI.
+* Real-engine tool tests: when a tiny model answers in text instead of calling the tool,
+  the test is reported as xfail, never as a silent pass.
+
 ## Remaining work (not implemented)
 
 * Audio input and output. These capabilities exist in the vocabulary, the catalog and
@@ -267,7 +300,7 @@ development sandbox, because its proxy blocks Hugging Face and the Ollama regist
   against real clusters and accounts.
 * Additional storage adapters: Azure Blob, and a native MinIO adapter (MinIO works today
   through the S3 adapter's `endpoint_url`, but this is untested).
-* SSO/OIDC, token rotation, multi-tenancy beyond per-token conversation ownership, and
-  rate limiting.
-* Cancellation across replicas (in-flight state is per process), and multi-replica
-  deployments on SQLite.
+* Multi-tenancy beyond per-principal conversation ownership: shared providers, settings
+  and metrics.
+* A login UI for OIDC; OMF validates tokens but runs no login flow (ADR-0014).
+* Global (cross-replica) rate limits, and multi-replica deployments on SQLite.

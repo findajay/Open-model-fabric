@@ -111,7 +111,7 @@ jobs:
           image=ghcr.io/ggml-org/llama.cpp:${{ matrix.image }}
           docker run -d --name llama-chat -p 8080:8080 -v ~/gguf:/models "$image" \
             -m "/models/$CHAT_FILE" --alias "$OMF_TEST_LLAMACPP_CHAT_MODEL" \
-            --host 0.0.0.0 --port 8080 -c 4096 --parallel 1
+            --host 0.0.0.0 --port 8080 -c 4096 --parallel 1 --jinja
           docker run -d --name llama-embed -p 8081:8081 -v ~/gguf:/models "$image" \
             -m "/models/$EMBED_FILE" --alias "$OMF_TEST_LLAMACPP_EMBED_MODEL" \
             --host 0.0.0.0 --port 8081 --embeddings -c 2048 -b 2048 -ub 2048

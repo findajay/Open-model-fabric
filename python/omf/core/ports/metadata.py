@@ -112,6 +112,34 @@ class InferenceRecordRepository(ABC):
     async def recent_records(self, *, limit: int = 50) -> list[InferenceRecord]: ...
 
 
+class RequestCoordinationRepository(ABC):
+    """Shared in-flight registry, so a cancel can reach the replica serving a request."""
+
+    @abstractmethod
+    async def register_inflight(self, request_id: str, owner: str | None, replica: str) -> None: ...
+
+    @abstractmethod
+    async def unregister_inflight(self, request_id: str) -> None: ...
+
+    @abstractmethod
+    async def inflight_owner(self, request_id: str) -> tuple[bool, str | None]:
+        """``(found, owner)`` for an in-flight request on any replica."""
+
+    @abstractmethod
+    async def list_inflight(self, owner: str | None = None) -> list[str]: ...
+
+    @abstractmethod
+    async def request_cancel(self, request_id: str) -> None: ...
+
+    @abstractmethod
+    async def take_cancels(self, request_ids: list[str]) -> list[str]:
+        """Return (and consume) pending cancel requests among ``request_ids``."""
+
+    @abstractmethod
+    async def prune_inflight(self, older_than_s: float) -> int:
+        """Forget registrations left behind by crashed replicas."""
+
+
 class MetadataStore(
     ProviderConfigRepository,
     ModelRegistrationRepository,
@@ -120,6 +148,7 @@ class MetadataStore(
     SettingsRepository,
     AuditLogRepository,
     InferenceRecordRepository,
+    RequestCoordinationRepository,
     ABC,
 ):
     """Aggregate implemented by metadata adapters."""
