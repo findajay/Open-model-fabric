@@ -1,7 +1,8 @@
-# Local stack. From the repository root:
-#   cp .env.example .env   # set OMF_ADMIN_TOKEN
-#   docker compose -f infrastructure/compose/docker-compose.yml up --build
-#   docker compose -f infrastructure/compose/docker-compose.yml --profile ollama up --build
+# Local stack. From the repository root (or use `make compose-up`):
+#   cp .env.example .env   # set OMF_ADMIN_TOKEN; optionally OMF_PORT
+#   docker compose --env-file .env -f infrastructure/compose/docker-compose.yml up --build
+#   docker compose --env-file .env -f infrastructure/compose/docker-compose.yml --profile ollama up --build
+# --env-file is required: Compose otherwise looks for .env next to this file, not in the root.
 name: open-model-fabric
 
 services:
@@ -11,7 +12,7 @@ services:
       dockerfile: infrastructure/docker/Dockerfile
     image: open-model-fabric:local
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:${OMF_PORT:-8080}:8080"
     environment:
       OMF_ADMIN_TOKEN: ${OMF_ADMIN_TOKEN:?set OMF_ADMIN_TOKEN in .env (at least 16 characters)}
       OMF_ENABLE_OLLAMA: ${OMF_ENABLE_OLLAMA:-false}
@@ -26,7 +27,7 @@ services:
     restart: unless-stopped
 
   # Optional real inference: `--profile ollama`, then pull a model:
-  #   docker compose -f infrastructure/compose/docker-compose.yml exec ollama ollama pull qwen2.5:0.5b
+  #   docker compose --env-file .env -f infrastructure/compose/docker-compose.yml exec ollama ollama pull qwen2.5:0.5b
   ollama:
     image: ollama/ollama:0.40.6
     profiles: ["ollama"]
