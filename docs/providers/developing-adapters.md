@@ -134,6 +134,8 @@ corruption detection, unsafe keys, files of more than 2 MB, empty files and stat
 | Kubernetes (compute) | `kubernetes` adapter: an OMF-labelled Deployment + ClusterIP Service, scaled between 0 and `replicas` | Implemented; tested against a fake API server, not a real cluster |
 | AWS EC2 (compute) | `aws_ec2` adapter: launches a tagged instance, or starts/stops a designated one | Implemented; tested against moto, not AWS |
 | Google Compute Engine (compute) | `gcp_compute` adapter: labelled VM with optional GPUs and startup script | Implemented; tested against a fake REST API, not Google Cloud |
-| Azure VMs (compute) | `azure_vm` adapter: start and deallocate an existing VM | Implemented (start/stop only); tested against a fake REST API, not Azure |
-| AWS ECS/Fargate, Cloud Run, Azure Container Apps (compute) | No compute adapter. OMF itself can be hosted on these (see deployment docs); its compute adapters do not manage them. | Not implemented |
+| Azure VMs (compute) | `azure_vm` adapter: provision (NIC + VM in an existing subnet), start, deallocate, delete; or start/stop a designated VM | Implemented; tested against a fake REST API, not Azure |
+| AWS ECS (compute) | `aws_ecs` adapter: tagged task definition + service, desired count 0..N | Implemented; tested against moto, not AWS |
+| Google Cloud Run (compute) | `gcp_cloud_run` adapter: labelled v2 service, min instances 0..N (stop = scale to zero), optional L4 GPU | Implemented; tested against a fake REST API, not Google Cloud |
+| Azure Container Apps (compute) | `azure_container_apps` adapter: tagged app in an existing environment, native start/stop | Implemented; tested against a fake REST API, not Azure |
 | S3, MinIO, Azure Blob (storage) | `s3` adapter targets S3 and S3-compatible stores such as MinIO (`endpoint_url`, `force_path_style`). It is contract-tested against moto's S3 emulation, not against AWS or MinIO. Azure Blob has no adapter. | S3: implemented; MinIO: by protocol, untested; Azure Blob: not implemented |
