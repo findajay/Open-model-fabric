@@ -127,7 +127,7 @@ corruption detection, unsafe keys, files of more than 2 MB, empty files and stat
 |---|---|---|
 | vLLM | `openai_compatible` (`max_model_len` read as context window) | Supported by protocol; tested against the emulator, not a live vLLM |
 | Hugging Face TGI (Messages API) | `openai_compatible` with `base_url: http://tgi/v1` | Supported by protocol; untested against live TGI |
-| llama.cpp `llama-server` | `openai_compatible` | Supported by protocol; untested live |
+| llama.cpp `llama-server` | `openai_compatible` (`--jinja` for tool calls, `--embeddings` for embeddings) | Tested in the `Real engines` CI workflow (chat, streaming, JSON, embeddings, cancellation, tool calls) |
 | Hugging Face Inference Endpoints | `openai_compatible` (when the endpoint exposes the OpenAI route) with `api_key_ref` | Untested live |
 | Custom REST model servers | `openai_compatible` if they implement the protocol; otherwise write a dedicated adapter as above | — |
 | Docker (compute) | `docker` adapter: Engine API over a Unix socket or TCP/TLS; pinned images, named volumes only, GPUs via device requests | Implemented; tested against a real Docker Engine |

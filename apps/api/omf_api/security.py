@@ -131,15 +131,20 @@ class Authenticator:
         if reload_s and time.monotonic() - self._loaded_at > reload_s:
             self.reload()
         digest = hashlib.sha256(token.encode()).digest()
-        match: _Key | None = None
+        now = datetime.now(UTC)
+        valid: _Key | None = None
+        expired = False
         for key in self._keys:  # check all to keep timing uniform
             if hmac.compare_digest(key.digest, digest):
-                match = key
-        if match is None:
-            raise AuthenticationRequired("invalid bearer token")
-        if match.expires_at is not None and datetime.now(UTC) >= _aware(match.expires_at):
-            raise AuthenticationRequired("bearer token expired")
-        return match.principal
+                if key.expires_at is not None and now >= _aware(key.expires_at):
+                    expired = True
+                elif valid is None:
+                    valid = key
+        # During a rotation the same secret may appear in an expired and a live entry:
+        # any live entry wins; "expired" only when every matching entry has expired.
+        if valid is not None:
+            return valid.principal
+        raise AuthenticationRequired("bearer token expired" if expired else "invalid bearer token")
 
 
 def _aware(value: datetime) -> datetime:

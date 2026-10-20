@@ -23,6 +23,8 @@ CONFIGS = Path(__file__).resolve().parents[2] / "configs"
         "production.example",
         "docker",
         "gpu-infrastructure.example",
+        "laptop-security.example",
+        "laptop-replicas.example",
         "storage-backends.example",
     ],
 )

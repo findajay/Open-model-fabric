@@ -1,0 +1,56 @@
+{
+  "realm": "omf",
+  "enabled": true,
+  "accessTokenLifespan": 900,
+  "roles": {
+    "realm": [
+      { "name": "omf-admin", "description": "Open Model Fabric administrator" },
+      { "name": "omf-user", "description": "Open Model Fabric user" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "omf-cli",
+      "name": "Open Model Fabric (local testing)",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": false,
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "omf-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "omf-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "User",
+      "credentials": [{ "type": "password", "value": "alice-password", "temporary": false }],
+      "realmRoles": ["omf-user"]
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@example.com",
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "credentials": [{ "type": "password", "value": "admin-password", "temporary": false }],
+      "realmRoles": ["omf-admin", "omf-user"]
+    }
+  ]
+}

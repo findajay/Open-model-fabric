@@ -1,0 +1,42 @@
+# Two API replicas sharing PostgreSQL, to try cross-replica cancellation on a laptop
+# (see docs/getting-started/laptop-test-guide.md):
+#
+#   docker run -d --name omf-pg -p 5432:5432 -e POSTGRES_PASSWORD=omf postgres:17.11
+#   export OMF_DATABASE_URL=postgresql+psycopg://postgres:omf@127.0.0.1:5432/postgres
+#   OMF_CONFIG=configs/laptop-replicas.example.yaml uv run python -m omf_api --port 8080
+#   OMF_CONFIG=configs/laptop-replicas.example.yaml uv run python -m omf_api --port 8081
+profile: laptop-replicas
+environment: development
+
+server:
+  host: 127.0.0.1
+  cancellation: shared                  # cancels reach whichever replica serves the stream
+
+auth:
+  mode: none                            # localhost only; see laptop-security.example.yaml
+
+metadata:
+  url_ref: env:OMF_DATABASE_URL
+
+compute:
+  - id: local
+    adapter: local
+
+storage:
+  - id: local
+    adapter: local_fs
+    default: true
+    config:
+      root: ./var/artifacts
+
+providers:
+  - id: mock
+    adapter_type: mock
+    display_name: Slow mock (long streams to cancel)
+    compute_environment_id: local
+    config:
+      token_delay_ms: 250
+
+inference:
+  default_provider: mock
+  default_model: mock-chat
