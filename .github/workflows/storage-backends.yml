@@ -8,7 +8,8 @@ name: Storage backends
 # and when a storage adapter, its tests or this workflow change.
 #
 # MinIO image: minio/minio is no longer published on Docker Hub, so this uses Bitnami's
-# frozen legacy build (bitnamilegacy/minio, MinIO RELEASE.2025-07-23).
+# frozen legacy build (bitnamilegacy/minio). It is built from source and reports
+# "DEVELOPMENT.2025-07-23T15-54-02Z", not an official RELEASE tag.
 
 on:
   workflow_dispatch:
