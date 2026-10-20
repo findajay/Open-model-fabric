@@ -113,7 +113,8 @@ compute:
         docker run -d --gpus all -p 8000:8000 vllm/vllm-openai:v0.32.0 \
           --model Qwen/Qwen2.5-0.5B-Instruct
 
-  # An existing Azure VM (created with Bicep/Terraform): start, and stop = deallocate.
+  # An existing Azure VM (created with Bicep/Terraform, no OMF tags): start, and
+  # stop = deallocate. Deprovision is refused for VMs OMF did not create.
   - id: azure-gpu
     adapter: azure_vm
     config:
@@ -127,6 +128,98 @@ compute:
       client_secret_ref: env:AZURE_CLIENT_SECRET
       endpoint_host: 10.0.0.4
       endpoint_port: 8000
+      health_path: /health
+
+  # An Azure VM that OMF creates: NIC in an existing subnet, VM from a marketplace image,
+  # SSH key login only, cloud-init starts the server. Deprovision deletes VM, NIC, disk.
+  - id: azure-gpu-managed
+    adapter: azure_vm
+    config:
+      display_name: Azure NC4as T4 v3 (managed)
+      allow_lifecycle: true
+      subscription_id: 00000000-0000-0000-0000-000000000000
+      resource_group: rg-inference
+      vm_name: omf-vllm
+      tenant_id: 00000000-0000-0000-0000-000000000000
+      client_id: 00000000-0000-0000-0000-000000000000
+      client_secret_ref: env:AZURE_CLIENT_SECRET
+      location: eastus
+      subnet_id: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-net/providers/Microsoft.Network/virtualNetworks/vnet-inference/subnets/gpu
+      vm_size: Standard_NC4as_T4_v3
+      image: microsoft-dsvm:ubuntu-hpc:2204:latest   # an image with NVIDIA drivers + Docker
+      ssh_public_key_ref: file:/run/secrets/omf_ssh_public_key
+      os_disk_gb: 128
+      endpoint_port: 8000                # host = the NIC's private IP
+      health_path: /health
+      custom_data: |
+        #cloud-config
+        runcmd:
+          - docker run -d --gpus all -p 8000:8000 vllm/vllm-openai:v0.32.0 --model Qwen/Qwen2.5-0.5B-Instruct
+
+  # An ECS service on GPU EC2 capacity (Fargate has no GPUs). start/stop = desired count.
+  - id: aws-ecs-gpu
+    adapter: aws_ecs
+    config:
+      display_name: ECS (g5 capacity)
+      allow_lifecycle: true
+      region: us-east-1
+      cluster: inference
+      service_name: vllm
+      image: vllm/vllm-openai:v0.32.0
+      command: ["--model", "Qwen/Qwen2.5-0.5B-Instruct"]
+      launch_type: EC2
+      gpus: 1
+      cpu: "4096"
+      memory: "15360"
+      subnets: [subnet-0123456789abcdef0]
+      security_group_ids: [sg-0123456789abcdef0]
+      execution_role_arn: arn:aws:iam::123456789012:role/ecsTaskExecutionRole
+      env_secret_arn_refs:
+        HF_TOKEN: arn:aws:secretsmanager:us-east-1:123456789012:secret:hf-token
+      endpoint_host: vllm-alb-123456.us-east-1.elb.amazonaws.com   # load balancer in front
+      endpoint_port: 80
+      health_path: /health
+
+  # A Cloud Run service with one L4 GPU. stop = scale to zero (still serves cold starts).
+  - id: gcp-cloud-run-gpu
+    adapter: gcp_cloud_run
+    config:
+      display_name: Cloud Run (L4)
+      allow_lifecycle: true
+      project: my-gcp-project
+      region: us-central1
+      service: omf-vllm
+      credentials_ref: file:/run/secrets/gcp_service_account.json
+      image: vllm/vllm-openai:v0.32.0
+      args: ["--model", "Qwen/Qwen2.5-0.5B-Instruct"]
+      gpu_type: nvidia-l4
+      cpu: "4"
+      memory: 16Gi
+      env_secret_manager_refs:
+        HF_TOKEN: hf-token:latest       # Secret Manager secret[:version]
+      health_path: /health
+
+  # An Azure Container App in an existing environment with a GPU workload profile.
+  - id: azure-aca-gpu
+    adapter: azure_container_apps
+    config:
+      display_name: Container Apps (serverless GPU)
+      allow_lifecycle: true
+      subscription_id: 00000000-0000-0000-0000-000000000000
+      resource_group: rg-inference
+      tenant_id: 00000000-0000-0000-0000-000000000000
+      client_id: 00000000-0000-0000-0000-000000000000
+      client_secret_ref: env:AZURE_CLIENT_SECRET
+      app_name: omf-vllm
+      location: swedencentral
+      managed_environment_id: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-inference/providers/Microsoft.App/managedEnvironments/inference-env
+      workload_profile_name: gpu-t4
+      image: vllm/vllm-openai:v0.32.0
+      args: ["--model", "Qwen/Qwen2.5-0.5B-Instruct"]
+      cpu: 8
+      memory: 56Gi
+      env_secret_refs:
+        HF_TOKEN: env:HF_TOKEN
       health_path: /health
 
 providers:

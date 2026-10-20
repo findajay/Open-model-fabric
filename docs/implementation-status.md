@@ -356,12 +356,48 @@ No real speech model was run. Only the mock and the OpenAI-compatible protocol
 emulator were used. Microphone recording relies on the browser's MediaRecorder and
 was not exercised in automated tests.
 
+## Phase 11 — Managed container services and Azure VM provisioning
+
+**Implemented.**
+* `aws_ecs`: a tagged task definition and service, desired count 0..N; Secrets Manager or
+  SSM ARNs (`env_secret_arn_refs`) for secrets; GPU resource requirements on EC2
+  capacity.
+* `gcp_cloud_run`: a labelled v2 service. Start and stop set the service-level
+  `scaling.minInstanceCount`; stop means scale to zero. Optional `nvidia-l4` GPU and
+  Secret Manager env vars (`env_secret_manager_refs`). Long-running operations are
+  polled.
+* `azure_container_apps`: a tagged app in an existing environment, with native start and
+  stop actions, an optional GPU workload profile, and secret env values stored as app
+  secrets.
+* `azure_vm`: provisioning creates a NIC in an existing subnet and a VM with SSH-key-only
+  login and cloud-init. Deprovision deletes the VM, NIC and disk (`deleteOption:
+  Delete`). VMs without tags stay designated: start and stop only.
+* A shared AWS helper (`_aws.py`, now also used by EC2) and a shared `pinned_image`
+  validator.
+
+**Verified API facts.**
+* The Cloud Run v2 field names (`scaling.minInstanceCount`, `nodeSelector.accelerator`,
+  the `nvidia.com/gpu` limit of exactly `"1"`, `cpuIdle`, `valueSource.secretKeyRef`, and
+  the operation shape) were checked against Google's discovery document.
+* The Azure api-versions and fields were checked against the Azure REST API specs:
+  `Microsoft.App/containerApps` `2025-01-01` with its `start` and `stop` actions;
+  `virtualMachines` and `networkInterfaces` `2024-07-01`, including `deleteOption`.
+* moto's ECS validates that subnets exist, so the tests create a real VPC and subnet.
+
+**Tests.** `tests/integration/test_compute_services.py` (9 tests) covers:
+* ECS against moto;
+* Cloud Run and Azure against REST fakes;
+* lifecycle, refusing foreign resources, request bodies (GPU, secrets, cloud-init), the
+  NIC wait, designated VMs, orphan NIC cleanup, and config validation.
+
+Removing the ECS ownership check makes these tests fail. None of these adapters has been
+run against a real cloud account.
+
 ## Remaining work (not implemented)
 
 * Server-side tool execution. This is deliberately out of scope; see ADR-0013.
-* Compute adapters for ECS/Fargate, Cloud Run and Azure Container Apps. Azure VM
-  provisioning (only start/stop exists). Runs of the Kubernetes and cloud adapters
-  against real clusters and accounts.
+* Runs of the Kubernetes and cloud compute adapters against real clusters and accounts;
+  only Docker has been run for real.
 * Multi-tenancy beyond per-principal conversation ownership: shared providers, settings
   and metrics.
 * A login UI for OIDC; OMF validates tokens but runs no login flow (ADR-0014).

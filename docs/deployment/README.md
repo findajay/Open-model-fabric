@@ -99,10 +99,14 @@ provider's `models:` list (the OpenAI protocol does not report them) and run
 
 ### Letting OMF manage the GPU infrastructure
 
-OMF can also run the inference server for you. The compute adapters `docker`,
-`kubernetes`, `aws_ec2`, `gcp_compute` and `azure_vm` create, start, stop and delete it
-(Azure: start and stop only). `configs/gpu-infrastructure.example.yaml` has one
-environment of each kind. The rules ([ADR-0012](../architecture/adr/0012-managed-compute-lifecycle.md)):
+OMF can also run the inference server for you. These compute adapters create, start,
+stop and delete it:
+
+- VMs and containers: `docker`, `kubernetes`, `aws_ec2`, `gcp_compute` and `azure_vm`
+  (Azure creates the NIC and VM in an existing subnet);
+- container services: `aws_ecs`, `gcp_cloud_run` and `azure_container_apps`.
+
+`configs/gpu-infrastructure.example.yaml` has one environment of each kind. The rules ([ADR-0012](../architecture/adr/0012-managed-compute-lifecycle.md)):
 
 - Nothing changes unless the environment sets `allow_lifecycle: true`. Even then, only
   admins can trigger operations (*Infrastructure* screen, or
@@ -115,15 +119,32 @@ environment of each kind. The rules ([ADR-0012](../architecture/adr/0012-managed
   - Kubernetes: one namespace, plus optional `list nodes`.
   - AWS: `ec2:Describe*`, `RunInstances`, `CreateTags`, `Start/Stop/TerminateInstances`,
     ideally conditioned on the `omf-managed` tag.
-  - Google Cloud: `compute.instances.*` in one project.
-  - Azure: *Virtual Machine Contributor* on one resource group.
+  - Google Cloud: `compute.instances.*` in one project. For Cloud Run, *Cloud Run
+    Developer* plus *Service Account User* on the runtime service account.
+  - AWS ECS: `ecs:RegisterTaskDefinition`, `DeregisterTaskDefinition`,
+    `Create/Update/Delete/DescribeServices`, `DescribeTaskDefinition`, `TagResource`, and
+    `iam:PassRole` for the task roles.
+  - Azure: *Virtual Machine Contributor* on one resource group, plus *Network
+    Contributor* on the subnet when OMF creates VMs. For Container Apps, *Container Apps
+    Contributor* on the resource group.
 - Compute adapters manage *where* the server runs. Register the server itself as an
   `openai_compatible` or `ollama` provider with `compute_environment_id` set to the
   environment.
 
-Only the Docker adapter has been tested against the real service. Kubernetes, Compute
-Engine and Azure were tested against fakes of their REST APIs, and EC2 against moto.
+Only the Docker adapter has been tested against the real service. The others were tested
+against fakes:
+- Kubernetes, Compute Engine, Cloud Run, Azure VMs and Container Apps against fakes of
+  their REST APIs;
+- EC2 and ECS against moto.
+
 Try them in a sandbox account first.
+
+What "stop" means differs by platform:
+- **ECS:** desired count 0.
+- **Cloud Run:** scale to zero. The service still answers requests with a cold start,
+  so deprovision it to make it unreachable.
+- **Container Apps:** Azure's stop action; the app runs no replicas.
+- **VMs:** stopped. Azure VMs are deallocated.
 
 ## Other container platforms (ECS, Cloud Run, Container Apps)
 
@@ -136,8 +157,11 @@ This has **not been tested**. The requirements are the same as for Kubernetes:
 - raise the load balancer's idle timeout above your longest stream (AWS ALB defaults to
   60 s).
 
-There is no compute adapter for ECS/Fargate services. Their GPU support is limited to
-EC2-backed capacity, and you can describe it with `aws_ec2` or `local`.
+Hosting OMF itself is separate from where models run. To let OMF run *inference
+servers* on these platforms, use the `aws_ecs`, `gcp_cloud_run` and
+`azure_container_apps` compute adapters. ECS GPUs need EC2 capacity, because Fargate has
+no GPUs. Cloud Run offers one NVIDIA L4 per instance in some regions. Container Apps
+needs a GPU workload profile on the environment.
 
 ## Google Colab
 
