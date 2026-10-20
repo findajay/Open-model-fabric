@@ -277,9 +277,10 @@ development sandbox, because its proxy blocks Hugging Face and the Ollama regist
   * a real account SAS, plus a tampered SAS that is rejected;
   * a wrong account key, which is rejected; this proves Azurite verifies signatures;
   * upload, download, list and delete through the HTTP API.
-* MinIO, in CI: the S3 adapter's contract suite. The image is
+* MinIO, in CI: the S3 adapter's contract suite passed 17/17. The image is
   `bitnamilegacy/minio:2025.7.23-debian-12-r5`, because `minio/minio` is no longer
-  published on Docker Hub.
+  published on Docker Hub. It is a source build that reports
+  `DEVELOPMENT.2025-07-23T15-54-02Z`.
 * MinIO was not run locally, because the sandbox's anonymous Docker Hub pulls were
   rate-limited (HTTP 429).
 
