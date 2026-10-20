@@ -231,6 +231,31 @@ Two adapter behaviours were mutation-checked: OpenAI fragment reassembly and the
 `tool_name` mapping. Breaking either one makes these tests fail. Real models were not run
 here. The real-engine CI work runs separately.
 
+## Real-engine tests
+
+`tests/real_engine` runs the Ollama and OpenAI-compatible adapters, and the API, against
+real engines on CPU. It covers:
+* discovery (Ollama capabilities are `provider_reported`);
+* chat, streaming with usage, and JSON mode;
+* embeddings, including a loose check that paraphrases are closer than unrelated text;
+* `verify`;
+* cancellation through the cancel endpoint and through client disconnect.
+
+The `real_engine` marker is deselected by default, so `pytest` and `make check` are
+unchanged. `.github/workflows/real-engines.yml` runs the tests on demand, weekly, and
+when they change:
+* Ollama `0.40.0` with `qwen2.5:0.5b` and `all-minilm`;
+* llama.cpp `server-b11515` with Qwen2.5-0.5B-Instruct Q4_K_M and nomic-embed-text-v1.5
+  Q4_K_M from Hugging Face.
+
+Models are cached between runs. The first run passed 7/7 on each engine. The engine
+logs show `cancel task` for both cancellation paths, so cancelling stops generation in
+the engine itself, not only in the API.
+
+The tests found no difference between the emulators and the real engines. They check
+behaviour, not byte-for-byte equality of payloads. These engines could not be run in the
+development sandbox, because its proxy blocks Hugging Face and the Ollama registry.
+
 ## Remaining work (not implemented)
 
 * Audio input and output. These capabilities exist in the vocabulary, the catalog and
@@ -246,5 +271,3 @@ here. The real-engine CI work runs separately.
   rate limiting.
 * Cancellation across replicas (in-flight state is per process), and multi-replica
   deployments on SQLite.
-* Real-engine integration tests in CI (for example an Ollama container with a tiny
-  model) next to the emulator tests.

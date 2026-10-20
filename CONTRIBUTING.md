@@ -22,6 +22,11 @@ make e2e       # browser tests (Playwright; starts the API, the web app and prot
 
 PostgreSQL tests run when `OMF_TEST_POSTGRES_URL` is set; CI always runs them.
 
+Real-engine tests (`tests/real_engine`) are opt-in: start Ollama or llama.cpp, set the
+`OMF_TEST_*` variables described in `tests/real_engine/conftest.py`, and run
+`pytest -m real_engine`. The *Real engines* workflow runs them in CI on demand, weekly,
+and whenever they change.
+
 ## Ground rules
 
 * **Respect the boundaries.** `python/omf/core` must not import adapters, FastAPI,
