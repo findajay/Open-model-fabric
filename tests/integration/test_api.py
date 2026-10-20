@@ -408,7 +408,15 @@ def test_cancellation_endpoint_and_disconnect_close_upstream_stream(
         assert (
             emulator_state(ollama_server).aborted_streams == 2
         )  # both upstream streams were closed
-        records = httpx.get(f"{api.url}/api/v1/requests/recent").json()["data"]
+        # The record is written by the (shielded) producer just after the upstream close,
+        # so wait for it as for the abort above instead of reading once.
+        records: list[dict[str, Any]] = []
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            records = httpx.get(f"{api.url}/api/v1/requests/recent").json()["data"]
+            if len(records) >= 2:
+                break
+            time.sleep(0.05)
         assert [r["status"] for r in records[:2]] == ["cancelled", "cancelled"]
 
 
