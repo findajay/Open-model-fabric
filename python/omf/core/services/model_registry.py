@@ -260,9 +260,16 @@ class ModelRegistryService:
     async def resolve(self, provider_id: str, model: str) -> ModelDeployment:
         """Find ``model`` (provider-native name or catalog id) on ``provider_id``."""
         deployments = await self.deployments(provider_id)
-        for d in deployments:
-            if d.provider_model == model:
+        by_name = {d.provider_model: d for d in deployments}
+        # Engines with ``name:tag`` models (Ollama) treat an untagged name as
+        # ``name:latest``; only that tag is implied, never another explicit one.
+        names = [model] if ":" in model else [model, f"{model}:latest"]
+        matches = [by_name[n] for n in names if n in by_name]
+        for d in matches:
+            if d.state == DeploymentState.AVAILABLE:
                 return d
+        if matches:
+            return matches[0]
         for d in deployments:
             if d.model_id == model and d.state == DeploymentState.AVAILABLE:
                 return d
