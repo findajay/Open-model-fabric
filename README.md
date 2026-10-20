@@ -1,48 +1,186 @@
-# Open Model Fabric
+<div align="center">
 
-**A provider-neutral, open-source AI application platform.** One gateway, one web UI and
-one SDK in front of interchangeable inference engines, compute environments, artifact
-stores and metadata databases, so you can swap any of them without touching application
-or domain code.
+<img src="docs/images/hero.svg" alt="Open Model Fabric: your app talks to one gateway that routes to Ollama, vLLM, any OpenAI-compatible server or a mock" width="100%">
 
-![AI Playground streaming from three different inference engines in one conversation](docs/images/playground.png)
+### One gateway, one UI, one SDK for every open model you run.
 
-*The same chat UI talking to a mock provider, an Ollama server and a remote
-OpenAI-compatible server in one conversation. This screenshot comes from the automated
-end-to-end test, where the Ollama and OpenAI-compatible servers are protocol emulators;
-point the same configuration at real servers for real models.*
+Swap Ollama, vLLM, llama.cpp, LM Studio or any OpenAI-compatible server without touching
+your app. Compare them side by side, with evidence. **No GPU required to start.**
 
-## What you get
+[![CI](https://github.com/findajay/Open-model-fabric/actions/workflows/ci.yml/badge.svg)](https://github.com/findajay/Open-model-fabric/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)
+![TypeScript](https://img.shields.io/badge/UI-React%20%2B%20TypeScript-3178C6?logo=typescript&logoColor=white)
+![No GPU needed](https://img.shields.io/badge/GPU-not%20required-10b981)
 
-| Area | What is implemented |
-|---|---|
-| **Inference gateway** | REST + Server-Sent Events streaming with a normalised event contract (`message.started`, `message.delta`, `usage.reported`, `message.completed`, `request.failed`), cancellation (explicit and on client disconnect), correlation ids, structured errors |
-| **Adapters** | Inference: mock (no GPU), Ollama (native API), OpenAI-compatible (vLLM, llama.cpp, TGI, LM Studio, …); chat, streaming, tool calling (passthrough), embeddings, and speech-to-text and text-to-speech (OpenAI-compatible audio API). Compute: local machine, Google Colab notebook (manually managed, ephemeral), and managed lifecycle (opt-in, admin-only) for Docker, Kubernetes, AWS EC2 and ECS, Google Compute Engine and Cloud Run, Azure VMs and Container Apps. Storage: local filesystem, Google Drive, S3-compatible (MinIO tested), Azure Blob. Metadata: SQLite and PostgreSQL (Alembic migrations). Secrets: environment and files. Telemetry: structured logs and optional OpenTelemetry |
-| **Provider registry** | Explicit adapter catalog with schema-validated configuration. Providers can be added, tested, enabled and disabled at runtime without a restart |
-| **Capability registry** | Claims with evidence (`verified` > `provider_reported` > `declared`). Anything undeclared is unsupported, and the UI only offers controls a model declares (e.g. image upload for vision models) |
-| **Routing** | Explicit provider, default provider, preferred provider with fallback, capability-based selection. Fallback must be enabled explicitly, happens only on retryable errors before any output, and sensitive prompts never go to external providers |
-| **Model registry** | Model definitions (family, modalities, context window, quantization, runtimes, artifacts, license) kept separate from deployments on specific providers |
-| **Benchmarks** | Versioned prompt datasets, cold vs warm measurements, TTFT, latency, tokens/s, error rates, hardware/quantization fingerprints, comparability warnings, CSV/JSON export (also to Google Drive) |
-| **Web app** | React + TypeScript + Vite + Tailwind + shadcn/ui-style components: Dashboard, AI Playground, Model Registry, Providers, Infrastructure, Benchmark Lab, Settings |
-| **Colab lab** | `notebooks/colab_model_lab.ipynb`: hardware and memory detection, optional Drive mount, pinned-revision safetensors download, checksums, TTFT and tokens/s measurement, CSV/JSON export, clean teardown; runs standalone |
-| **Security** | Backend-only secrets referenced as `env:`/`file:`, API keys with expiry and no-restart rotation, OIDC single sign-on (JWT validation), user/admin roles, per-principal rate limits, SSRF egress policy, request limits, upload validation, CORS allowlist, audit log, no prompt text in telemetry by default |
-| **Developer experience** | `make dev` (no GPU), Docker/Compose/Kubernetes, generated OpenAPI contract and TypeScript SDK, strict typing (mypy, tsc), lint, unit/contract/integration/e2e tests, CI, security scanning |
+[Quick start](#-quick-start) · [Connect a model](#-connect-a-real-model) ·
+[Features](#-what-you-get) · [Architecture](#-architecture) · [Docs](docs/README.md)
 
-## Quick start (no GPU, no cloud account)
+</div>
+
+<br>
+
+<p align="center">
+  <img src="docs/images/playground-demo.gif" alt="The AI Playground streaming a real answer from Qwen2.5 0.5B running in Ollama on a laptop CPU" width="90%">
+  <br>
+  <sub>Real recording: Qwen2.5-0.5B in Ollama on a laptop CPU, streamed through the Playground. First token in 38 ms.</sub>
+</p>
+
+## ✨ Why Open Model Fabric
+
+- **Stop rewriting integrations.** Your app speaks one API (REST + streaming, typed
+  TypeScript SDK). Engines are adapters you switch in config or at runtime.
+- **Know what a model can really do.** Capabilities carry evidence: `verified` by a
+  probe, `provider_reported`, or just `declared`. The UI only offers what the model
+  supports.
+- **Measure, don't guess.** The Benchmark Lab runs versioned prompt sets and reports
+  time-to-first-token, latency and tokens/s per engine and hardware.
+- **Safe by default.** Secrets stay on the server, prompts marked sensitive never leave
+  local providers, fallbacks are opt-in, and every routing decision is recorded.
+
+## 🚀 Quick start
+
+### Option A: Docker (Windows, macOS, Linux)
+
+You need [Docker](https://docs.docker.com/get-docker/) (Docker Desktop on Windows/macOS).
 
 ```bash
-make install    # uv + pnpm, from lockfiles
-make dev        # API http://127.0.0.1:8080 (docs at /docs) + UI http://localhost:5173
+git clone https://github.com/findajay/Open-model-fabric.git
+cd Open-model-fabric
+cp .env.example .env            # Windows PowerShell: Copy-Item .env.example .env
 ```
 
-Then try `make demo` (the same request against mock → Ollama → OpenAI-compatible) and
-`make e2e` (the same thing in a real browser). See the
-[quickstart](docs/getting-started/quickstart.md) to connect real Ollama or vLLM
-servers, and the [laptop test guide](docs/getting-started/laptop-test-guide.md) for a
-step-by-step check of every feature (tools, embeddings, audio, SSO, rate limits,
-multi-replica cancellation, storage and compute).
+Set `OMF_ADMIN_TOKEN` in `.env` to a random string of 16+ characters
+(`openssl rand -hex 24`, or `[guid]::NewGuid().ToString("N")` in PowerShell) and
+`OMF_ENABLE_OLLAMA=true`. Then:
 
-## Architecture in one picture
+```bash
+docker compose --env-file .env -f infrastructure/compose/docker-compose.yml --profile ollama up --build -d
+docker compose --env-file .env -f infrastructure/compose/docker-compose.yml exec ollama ollama pull qwen2.5:0.5b
+```
+
+Open **http://localhost:8080**, go to **Settings** and paste your token. Pick provider
+`ollama` in the Playground and start chatting. Port 8080 taken? See
+[troubleshooting](docs/getting-started/troubleshooting.md).
+
+### Option B: from source (Linux, macOS, or WSL2 on Windows)
+
+Prerequisites: [uv](https://docs.astral.sh/uv/), Node.js 20+, `make`, and pnpm via
+`corepack enable`.
+
+```bash
+make install    # Python + Node dependencies from lockfiles
+make dev        # API on http://127.0.0.1:8080 + UI on http://localhost:5173
+```
+
+No token, no GPU, no cloud account: the `mock` provider answers instantly. Then try
+`make demo` (one request against mock → Ollama → OpenAI-compatible) and `make check`
+(lint, types and the test suite CI runs).
+
+> On Windows, clone inside WSL2 (not under `/mnt/c`) for the source route. The
+> [laptop test guide](docs/getting-started/laptop-test-guide.md) walks through every
+> feature step by step.
+
+## 🔌 Connect a real model
+
+Anything that speaks the Ollama or OpenAI API works. Add it under **Providers → Add
+provider**, no restart needed, or in a config profile:
+
+| Engine | Adapter | Typical `base_url` |
+|---|---|---|
+| [Ollama](https://ollama.com) | `ollama` | `http://127.0.0.1:11434` |
+| [vLLM](https://docs.vllm.ai) | `openai_compatible` | `http://gpu-box:8000/v1` |
+| [llama.cpp server](https://github.com/ggml-org/llama.cpp) | `openai_compatible` | `http://127.0.0.1:8080/v1` |
+| [LM Studio](https://lmstudio.ai) | `openai_compatible` | `http://127.0.0.1:1234/v1` |
+| Hosted APIs (OpenRouter, Groq, …) | `openai_compatible` | provider's `/v1` URL, key via `api_key_ref` |
+
+API keys are never stored in config: profiles reference them as `env:NAME` or
+`file:/run/secrets/name`. Details: [quickstart](docs/getting-started/quickstart.md) ·
+[model compatibility](docs/providers/model-compatibility.md).
+
+### Do you even need a GPU?
+
+For small models, often not. Same prompts, same model, measured with this project:
+
+<p align="center">
+  <img src="docs/images/benchmark-cpu-vs-gpu.svg" alt="Qwen2.5-0.5B: 65.4 tokens per second on a laptop CPU with Ollama 4-bit, versus 34.8 on a free Colab T4 with unquantized transformers" width="80%">
+</p>
+
+A 4-bit build on a laptop CPU beat the unquantized model on a free cloud T4. GPUs win
+for larger models; the [Benchmark Lab](#-what-you-get) and the
+[Colab notebook](notebooks/colab_model_lab.ipynb) let you find the crossover for your
+own hardware.
+
+## 🧰 What you get
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**🎛️ Gateway and routing**<br>
+REST + Server-Sent Events with one event contract, cancellation, tool calling,
+embeddings, speech-to-text and text-to-speech. Explicit, default, preferred-with-fallback
+and capability-based routing.
+
+</td>
+<td width="50%" valign="top">
+
+**🧪 Playground and Benchmark Lab**<br>
+Chat with any provider, toggle streaming, JSON mode and tools. Versioned prompt sets,
+cold vs warm runs, TTFT, tokens/s, hardware fingerprints, CSV/JSON export.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**📚 Model registry**<br>
+What a model *is* (family, context, license, quantization) kept apart from where it
+*runs*. Capability claims with evidence; one-click verification.
+
+</td>
+<td valign="top">
+
+**🔐 Security built in**<br>
+API keys with expiry and rotation, OIDC single sign-on, roles, rate limits, SSRF egress
+policy, audit log, no prompt text in telemetry by default.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+**☁️ Compute and storage adapters**<br>
+Local, Docker, Kubernetes, AWS, Google Cloud and Azure compute; local disk, S3, Azure
+Blob and Google Drive storage; SQLite or PostgreSQL metadata.
+
+</td>
+<td valign="top">
+
+**🛠️ Developer experience**<br>
+`make dev` without a GPU, generated OpenAPI contract and TypeScript SDK, strict typing,
+unit, contract, integration and browser e2e tests in CI.
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary><b>🖼️ More screenshots</b></summary>
+<br>
+
+| Dashboard | Providers |
+|---|---|
+| ![Dashboard with provider health and request metrics](docs/images/dashboard.png) | ![Providers page with health checks](docs/images/providers.png) |
+
+**Playground with three engines in one conversation** (from the automated e2e test,
+where Ollama and the OpenAI-compatible server are protocol emulators):
+
+![Playground streaming from mock, Ollama and an OpenAI-compatible server](docs/images/playground.png)
+
+</details>
+
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
@@ -53,20 +191,20 @@ flowchart LR
   R --> S["Application services<br/>routing · inference · model registry ·<br/>health · benchmarks · settings"]
   S --> P{{Ports}}
   P --> I["Inference adapters<br/>mock · Ollama · OpenAI-compatible"]
-  P --> C["Compute adapters<br/>local · Colab (manual) · Docker · Kubernetes · EC2 · ECS · GCE · Cloud Run · Azure VM · Container Apps"]
-  P --> St["Storage adapters<br/>local FS · Google Drive · S3"]
+  P --> C["Compute adapters<br/>local · Colab (manual) · Docker · Kubernetes · cloud VMs"]
+  P --> St["Storage adapters<br/>local FS · S3 · Azure Blob · Google Drive"]
   P --> M["Metadata<br/>SQLite · PostgreSQL"]
-  P --> X["Secrets · Telemetry"]
-  I --> E1[(Ollama)] & E2[(vLLM / llama.cpp / TGI)]
+  I --> E1[(Ollama)] & E2[(vLLM / llama.cpp / LM Studio)]
 ```
 
 The core (`python/omf/core`) never imports a web framework, HTTP client, database driver
-or provider SDK; a test enforces that boundary. Adapters are registered explicitly in one
-composition root (`python/omf/bootstrap/catalog.py`), and configuration can only select
-them by id. Details: [architecture overview](docs/architecture/overview.md),
-[ADRs](docs/architecture/adr/README.md).
+or provider SDK, and a test enforces that boundary. Adapters are registered explicitly in
+one composition root (`python/omf/bootstrap/catalog.py`). More:
+[architecture overview](docs/architecture/overview.md) · [ADRs](docs/architecture/adr/README.md) ·
+[writing an adapter](docs/providers/developing-adapters.md).
 
-## Repository layout
+<details>
+<summary><b>📁 Repository layout</b></summary>
 
 ```text
 apps/api/omf_api          FastAPI application (routers, SSE, auth, middleware)
@@ -84,47 +222,43 @@ examples/react-chat       minimal chat UI built on the SDK
 docs                      architecture, ADRs, providers, deployment, security
 ```
 
-## Status and honesty notes
+</details>
 
-* **Verified in this repository's test suite:** startup without a GPU, mock end to end,
-  streaming, cancellation (explicit and on disconnect), provider switching (UI and API),
-  meaningful errors for unavailable providers, capability-driven UI, the storage contract
-  for all three storage adapters, persistence across restarts, configuration validation,
-  credentials never appearing in API responses, benchmark export, standalone notebook
-  execution (smoke mode), and graceful behaviour when Colab is offline. The suite runs
-  against SQLite and PostgreSQL (16 locally, 17 in CI), on Python 3.11 and 3.13, and is green in GitHub Actions (including the browser e2e test, the Docker build and the notebook smoke run).
-* **Tested against protocol emulators, not real engines:** Ollama and OpenAI-compatible
-  servers (`tests/emulators`) and Google Drive (`tests/contract/fake_drive.py`). S3 is
-  tested with `moto`. Real Ollama, vLLM, Google Drive and AWS were not reachable from the
-  development environment. Running `make demo`/`make e2e` with `E2E_OLLAMA_URL`/
-  `E2E_OPENAI_URL` set exercises real servers.
-* **The notebook's real Hugging Face download/GPU path** is written for Colab but was
-  only executed in offline smoke mode (tiny random Qwen2 model on CPU).
-* **Audio** (speech-to-text, text-to-speech) is tested against the mock and the
-  OpenAI-compatible emulator only, not a real speech model.
-* **Not implemented yet:** server-side tool execution (by design, tool calls are
-  passed through to the client); an OIDC login UI (OMF validates SSO tokens; clients
-  obtain them).
-* **Compute lifecycle adapters:** only Docker was tested against the real service.
-  Kubernetes, Compute Engine, Cloud Run, Azure VMs and Container Apps were tested
-  against REST fakes, and EC2 and ECS against moto.
+<details>
+<summary><b>✅ What is tested, and how</b></summary>
+<br>
 
-See [docs/implementation-status.md](docs/implementation-status.md) for the phase-by-phase
-report.
+* **In CI:** startup without a GPU, mock end to end, streaming, cancellation, provider
+  switching, errors for unavailable providers, capability-driven UI, storage contracts,
+  persistence across restarts, configuration validation, credentials never appearing in
+  API responses, benchmark export and the notebook smoke run. Python 3.11 and 3.13,
+  SQLite and PostgreSQL, plus a browser e2e test and the Docker build.
+* **Against protocol emulators in CI, and real engines by hand:** Ollama and
+  OpenAI-compatible servers (`tests/emulators`); real Ollama with Qwen2.5 was used for the
+  recording above. Google Drive is tested against a fake, S3 with `moto`.
+* **Compute lifecycle:** Docker against the real service; Kubernetes, Compute Engine,
+  Cloud Run and Azure against REST fakes; EC2 and ECS against `moto`.
+* **Not implemented yet:** server-side tool execution (tool calls are passed through to
+  the client) and an OIDC login UI (OMF validates SSO tokens; clients obtain them).
 
-## Model licenses
+Full report: [implementation status](docs/implementation-status.md).
 
-Open-weight model licenses are **not** open-source software licenses; some restrict
-commercial use. The catalog records license metadata per model — read
+</details>
+
+## ⚖️ Model licenses
+
+Open-weight model licenses are **not** open-source software licenses, and some restrict
+commercial use. The catalog records license metadata per model; read
 [model licensing](docs/providers/model-licensing.md). Model weights are never committed
 to this repository.
 
-## Contributing and security
+## 🤝 Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) · [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) ·
-[SECURITY.md](SECURITY.md) · [Writing an adapter](docs/providers/developing-adapters.md)
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md),
+[the code of conduct](CODE_OF_CONDUCT.md) and [writing an adapter](docs/providers/developing-adapters.md).
+Security reports: [SECURITY.md](SECURITY.md).
 
-## License
+## 📄 License
 
-Apache License 2.0 — see [LICENSE](LICENSE). Copyright the Open Model Fabric
+Apache License 2.0, see [LICENSE](LICENSE). Copyright the Open Model Fabric
 contributors.
