@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -30,6 +30,7 @@ from omf.adapters.inference._http import HttpEndpoint, check_vectors, read_error
 from omf.core.domain.capabilities import Capability, CapabilitySet, Modality
 from omf.core.domain.errors import OMFError, ProviderAuthenticationFailed, ProviderError
 from omf.core.domain.models import (
+    SPEECH_FORMATS,
     AuthRequirement,
     ChatMessage,
     DiscoveredModel,
@@ -45,8 +46,12 @@ from omf.core.domain.models import (
     ProviderOperation,
     ResponseFormat,
     Role,
+    SpeechRequest,
+    SpeechResult,
     TokenUsage,
     ToolCall,
+    TranscriptionRequest,
+    TranscriptionResult,
     utcnow,
 )
 from omf.core.ports.inference import InferenceProvider
@@ -54,6 +59,7 @@ from omf.core.ports.registry import AdapterContext
 from omf.core.ports.secrets import SecretRefStr
 
 ADAPTER_TYPE = "openai_compatible"
+MAX_SPEECH_BYTES = 50 * 1024 * 1024
 ADAPTER_VERSION = "1.0.0"
 _FORBIDDEN_HEADERS = {
     "authorization",
@@ -79,6 +85,9 @@ class OpenAICompatibleConfig(BaseModel):
     list_models: bool = True
     """Some servers lack ``GET /models``; then only the declared ``models`` are used."""
     verify_tls: bool = True
+    transcription_format: Literal["json", "verbose_json"] = "json"
+    """``verbose_json`` also returns language and duration (Whisper servers); some models
+    (e.g. ``gpt-4o-transcribe``) only accept ``json``."""
 
     @field_validator("extra_headers")
     @classmethod
@@ -374,6 +383,67 @@ class OpenAICompatibleInferenceAdapter(InferenceProvider):
             usage=_usage(payload.get("usage")),
         )
 
+    async def transcribe(self, request: TranscriptionRequest) -> TranscriptionResult:
+        data = {"model": request.model, "response_format": self._config.transcription_format}
+        if request.language:
+            data["language"] = request.language
+        if request.prompt:
+            data["prompt"] = request.prompt
+        await self._http.ensure_egress()
+        try:
+            response = await self._http.client.post(
+                "/audio/transcriptions",
+                data=data,
+                files={"file": (request.filename, request.audio, request.content_type)},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            self._http.raise_for(exc)
+        if response.headers.get("content-type", "").startswith("text/plain"):
+            return TranscriptionResult(text=response.text.strip())
+        try:
+            payload = response.json()
+            text = payload["text"]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ProviderError(
+                f"provider {self.provider_id!r} returned an unexpected transcription payload"
+            ) from exc
+        duration = payload.get("duration")
+        return TranscriptionResult(
+            text=str(text).strip(),
+            language=payload.get("language"),
+            duration_s=float(duration) if isinstance(duration, int | float) else None,
+            usage=_usage(payload.get("usage")),
+        )
+
+    async def synthesize(self, request: SpeechRequest) -> SpeechResult:
+        body = {
+            "model": request.model,
+            "input": request.input,
+            "voice": request.voice,
+            "response_format": request.format,
+            "speed": request.speed,
+        }
+        await self._http.ensure_egress()
+        try:
+            response = await self._http.client.post("/audio/speech", json=body)
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            self._http.raise_for(exc)
+        content_type = response.headers.get("content-type", "").split(";")[0].strip()
+        if not response.content or content_type.startswith(("application/json", "text/")):
+            raise ProviderError(
+                f"provider {self.provider_id!r} returned no audio "
+                f"(content type {content_type or 'missing'!r})"
+            )
+        if len(response.content) > MAX_SPEECH_BYTES:
+            raise ProviderError(f"provider {self.provider_id!r} returned oversized audio")
+        return SpeechResult(
+            audio=response.content,
+            # Servers differ (audio/mpeg vs audio/mp3); report the canonical type.
+            content_type=SPEECH_FORMATS[request.format],
+        )
+
     async def health_check(self) -> ProviderHealth:
         started = time.perf_counter()
         try:
@@ -419,6 +489,8 @@ CAPABILITIES = ProviderCapabilities(
         ProviderOperation.STREAM_GENERATE,
         ProviderOperation.HEALTH_CHECK,
         ProviderOperation.EMBED,
+        ProviderOperation.TRANSCRIBE,
+        ProviderOperation.SYNTHESIZE,
     ],
     modalities=[Modality.TEXT, Modality.IMAGE],
     streaming=True,

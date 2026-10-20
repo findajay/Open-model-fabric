@@ -614,6 +614,73 @@
         "title": "BenchmarkTarget",
         "type": "object"
       },
+      "Body_create_transcription_api_v1_audio_transcriptions_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "description": "wav, mp3, m4a, ogg, webm or flac",
+            "title": "File",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z]{2,3}(-[A-Za-z]{2,4})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/Sensitivity",
+            "default": "normal"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_transcription_api_v1_audio_transcriptions_post",
+        "type": "object"
+      },
       "Body_upload_artifact_api_v1_storage__storage_id__artifacts_post": {
         "properties": {
           "file": {
@@ -1892,6 +1959,22 @@
         "title": "Envelope[SystemInfo]",
         "type": "object"
       },
+      "Envelope_TranscriptionResponse_": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TranscriptionResponse"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "title": "Envelope[TranscriptionResponse]",
+        "type": "object"
+      },
       "Envelope_dict_str__Any__": {
         "properties": {
           "data": {
@@ -2637,7 +2720,9 @@
             "default": "chat",
             "enum": [
               "chat",
-              "embeddings"
+              "embeddings",
+              "transcription",
+              "speech"
             ],
             "title": "Operation",
             "type": "string"
@@ -3754,7 +3839,9 @@
           "stream_generate",
           "health_check",
           "cancel",
-          "embed"
+          "embed",
+          "transcribe",
+          "synthesize"
         ],
         "title": "ProviderOperation",
         "type": "string"
@@ -4239,6 +4326,75 @@
         ],
         "title": "Sensitivity",
         "type": "string"
+      },
+      "SpeechBody": {
+        "additionalProperties": false,
+        "properties": {
+          "format": {
+            "default": "wav",
+            "enum": [
+              "mp3",
+              "wav",
+              "opus",
+              "flac"
+            ],
+            "title": "Format",
+            "type": "string"
+          },
+          "input": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Input",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "provider_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Id"
+          },
+          "sensitivity": {
+            "$ref": "#/components/schemas/Sensitivity",
+            "default": "normal"
+          },
+          "speed": {
+            "default": 1.0,
+            "maximum": 4.0,
+            "minimum": 0.25,
+            "title": "Speed",
+            "type": "number"
+          },
+          "voice": {
+            "default": "alloy",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Voice",
+            "type": "string"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "title": "SpeechBody",
+        "type": "object"
       },
       "StorageArtifact": {
         "properties": {
@@ -4784,6 +4940,89 @@
         "title": "ToolDefinition",
         "type": "object"
       },
+      "TranscriptionResponse": {
+        "properties": {
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "provider_id": {
+            "title": "Provider Id",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "route": {
+            "$ref": "#/components/schemas/RouteDecision"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "timings": {
+            "$ref": "#/components/schemas/Timings"
+          },
+          "usage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TokenUsage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "request_id",
+          "provider_id",
+          "model",
+          "model_id",
+          "text",
+          "language",
+          "duration_s",
+          "usage",
+          "timings",
+          "route"
+        ],
+        "title": "TranscriptionResponse",
+        "type": "object"
+      },
       "UsageReported": {
         "properties": {
           "request_id": {
@@ -4856,6 +5095,87 @@
         "summary": "Adapter types compiled into this build",
         "tags": [
           "providers"
+        ]
+      }
+    },
+    "/api/v1/audio/speech": {
+      "post": {
+        "operationId": "create_speech_api_v1_audio_speech_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "audio/flac": {},
+              "audio/mpeg": {},
+              "audio/ogg": {},
+              "audio/wav": {}
+            },
+            "description": "The audio. Headers X-OMF-Provider and X-OMF-Model name the route."
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Text-to-speech with a model that declares audio_output (returns audio bytes)",
+        "tags": [
+          "audio"
+        ]
+      }
+    },
+    "/api/v1/audio/transcriptions": {
+      "post": {
+        "operationId": "create_transcription_api_v1_audio_transcriptions_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_transcription_api_v1_audio_transcriptions_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Envelope_TranscriptionResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Speech-to-text with a model that declares audio_input",
+        "tags": [
+          "audio"
         ]
       }
     },
@@ -6008,7 +6328,9 @@
               "default": "chat",
               "enum": [
                 "chat",
-                "embeddings"
+                "embeddings",
+                "transcription",
+                "speech"
               ],
               "title": "Operation",
               "type": "string"

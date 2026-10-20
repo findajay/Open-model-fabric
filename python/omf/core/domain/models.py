@@ -185,6 +185,8 @@ class ProviderOperation(StrEnum):
     HEALTH_CHECK = "health_check"
     CANCEL = "cancel"  # optional
     EMBED = "embed"  # optional
+    TRANSCRIBE = "transcribe"  # optional (speech-to-text)
+    SYNTHESIZE = "synthesize"  # optional (text-to-speech)
 
 
 MANDATORY_INFERENCE_OPERATIONS = frozenset(
@@ -518,6 +520,66 @@ class EmbeddingResult(DomainModel):
     usage: TokenUsage | None = None
 
 
+AUDIO_INPUT_TYPES = {
+    "audio/wav": "wav",
+    "audio/x-wav": "wav",
+    "audio/wave": "wav",
+    "audio/mpeg": "mp3",
+    "audio/mp3": "mp3",
+    "audio/mp4": "m4a",
+    "audio/m4a": "m4a",
+    "audio/x-m4a": "m4a",
+    "audio/ogg": "ogg",
+    "audio/webm": "webm",
+    "video/webm": "webm",  # some browsers label MediaRecorder audio as video/webm
+    "audio/flac": "flac",
+    "audio/x-flac": "flac",
+}
+"""Accepted upload content types (parameters such as ``;codecs=opus`` are ignored)."""
+
+SPEECH_FORMATS = {
+    "mp3": "audio/mpeg",
+    "wav": "audio/wav",
+    "opus": "audio/ogg",
+    "flac": "audio/flac",
+}
+
+
+class TranscriptionRequest(DomainModel):
+    """Speech-to-text request as seen by an adapter: already routed."""
+
+    request_id: str
+    model: str
+    audio: bytes = Field(repr=False)
+    filename: str
+    content_type: str
+    language: str | None = Field(default=None, pattern=r"^[a-z]{2,3}(-[A-Za-z]{2,4})?$")
+    prompt: str | None = Field(default=None, max_length=2000)
+
+
+class TranscriptionResult(DomainModel):
+    text: str
+    language: str | None = None
+    duration_s: float | None = None
+    usage: TokenUsage | None = None
+
+
+class SpeechRequest(DomainModel):
+    """Text-to-speech request as seen by an adapter: already routed."""
+
+    request_id: str
+    model: str
+    input: str = Field(min_length=1, max_length=4096)
+    voice: str = Field(min_length=1, max_length=64)
+    format: Literal["mp3", "wav", "opus", "flac"] = "mp3"
+    speed: float = Field(default=1.0, ge=0.25, le=4.0)
+
+
+class SpeechResult(DomainModel):
+    audio: bytes = Field(repr=False)
+    content_type: str
+
+
 class Timings(DomainModel):
     total_ms: float
     ttft_ms: float | None = None
@@ -570,11 +632,24 @@ class EmbeddingResponse(DomainModel):
     route: RouteDecision
 
 
+class TranscriptionResponse(DomainModel):
+    request_id: str
+    provider_id: str
+    model: str
+    model_id: str | None = None
+    text: str
+    language: str | None = None
+    duration_s: float | None = None
+    usage: TokenUsage | None = None
+    timings: Timings
+    route: RouteDecision
+
+
 class InferenceRecord(DomainModel):
     """Observability record for one request. Never contains prompt or completion text."""
 
     request_id: str
-    operation: Literal["chat", "embeddings"] = "chat"
+    operation: Literal["chat", "embeddings", "transcription", "speech"] = "chat"
     provider_id: str | None
     model: str | None
     status: RequestStatus
