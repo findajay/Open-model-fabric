@@ -15,7 +15,7 @@ from pydantic import BaseModel, ValidationError
 from omf.adapters._google import ServiceAccountTokenSource
 from omf.adapters.compute import aws_ec2, azure_vm, colab, docker, gcp_compute, kubernetes, local
 from omf.adapters.inference import mock, ollama, openai_compatible
-from omf.adapters.storage import google_drive, local_fs, s3
+from omf.adapters.storage import azure_blob, google_drive, local_fs, s3
 from omf.core.domain.errors import ConfigurationError, ValidationFailed
 from omf.core.domain.models import Locality
 from omf.core.ports.compute import ComputeProvider
@@ -221,10 +221,34 @@ def _s3_storage(sid: str, raw: dict[str, Any], ctx: AdapterContext) -> ArtifactS
     return s3.S3StorageAdapter.from_config(sid, config, access, secret)
 
 
+def _azure_blob_storage(
+    sid: str, raw: dict[str, Any], ctx: AdapterContext
+) -> ArtifactStorageProvider:
+    config = _parse(azure_blob.AzureBlobConfig, raw, "azure_blob")
+    ctx.egress.check_url_syntax(config.endpoint)
+    ctx.egress.check_url_syntax(config.authority_url)
+    return azure_blob.AzureBlobStorageAdapter(
+        sid,
+        config,
+        ctx.egress,
+        account_key=_secret(ctx, config.account_key_ref),
+        sas_token=_secret(ctx, config.sas_token_ref),
+        client_secret=_secret(ctx, config.client_secret_ref),
+    )
+
+
 STORAGE_ADAPTERS: dict[str, StorageFactory] = {
     local_fs.ADAPTER_TYPE: _local_storage,
     google_drive.ADAPTER_TYPE: _gdrive_storage,
     s3.ADAPTER_TYPE: _s3_storage,
+    azure_blob.ADAPTER_TYPE: _azure_blob_storage,
+}
+
+STORAGE_CONFIG_MODELS: dict[str, type[BaseModel]] = {
+    local_fs.ADAPTER_TYPE: local_fs.LocalFilesystemConfig,
+    google_drive.ADAPTER_TYPE: google_drive.GoogleDriveConfig,
+    s3.ADAPTER_TYPE: s3.S3Config,
+    azure_blob.ADAPTER_TYPE: azure_blob.AzureBlobConfig,
 }
 
 
@@ -259,11 +283,7 @@ def describe_component_adapters() -> list[dict[str, Any]]:
         (
             "storage",
             STORAGE_ADAPTERS,
-            {
-                local_fs.ADAPTER_TYPE: local_fs.LocalFilesystemConfig,
-                google_drive.ADAPTER_TYPE: google_drive.GoogleDriveConfig,
-                s3.ADAPTER_TYPE: s3.S3Config,
-            },
+            STORAGE_CONFIG_MODELS,
         ),
     ]
     for kind, mapping, models in groups:
