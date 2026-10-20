@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 220" width="720" height="220" role="img" aria-labelledby="t d">
+  <title id="t">Qwen2.5-0.5B: laptop CPU versus free Colab T4</title>
+  <desc id="d">Same smoke prompts, 128-token answers. Laptop CPU through Ollama (4-bit): 65.4 tokens per second, 506 ms median answer. Colab T4 GPU through transformers, unquantized: 34.8 tokens per second, 945 ms median answer.</desc>
+  <style>
+    .bg { fill: #f8fafc; }
+    .h { font: 600 16px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0f172a; }
+    .l { font: 600 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0f172a; }
+    .s { font: 400 12px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #475569; }
+    .v { font: 600 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #0f172a; }
+    .track { fill: #e2e8f0; }
+    .cpu { fill: #10b981; }
+    .gpu { fill: #94a3b8; }
+    .bar { transform-box: fill-box; transform-origin: left center; animation: grow 1.2s cubic-bezier(.2,.7,.2,1) both; }
+    .b2 { animation-delay: .25s; }
+    @keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    @media (prefers-reduced-motion: reduce) { .bar { animation: none; } }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .h, .l, .v { fill: #f0f6fc; }
+      .s { fill: #9da7b3; }
+      .track { fill: #21262d; }
+      .gpu { fill: #6e7681; }
+    }
+  </style>
+  <rect class="bg" width="720" height="220" rx="14"/>
+  <text class="h" x="28" y="40">Qwen2.5-0.5B · tokens per second (higher is better)</text>
+  <text class="s" x="28" y="62">Same smoke prompts, 128-token answers, warm runs. Measured with the Benchmark Lab and the Colab notebook.</text>
+
+  <text class="l" x="28" y="104">Laptop CPU</text>
+  <text class="s" x="28" y="122">Ollama · 4-bit · OMF</text>
+  <rect class="track" x="200" y="92" width="400" height="26" rx="6"/>
+  <rect class="cpu bar" x="200" y="92" width="400" height="26" rx="6"/>
+  <text class="v" x="614" y="110">65.4</text>
+
+  <text class="l" x="28" y="164">Free Colab T4</text>
+  <text class="s" x="28" y="182">transformers · unquantized</text>
+  <rect class="track" x="200" y="152" width="400" height="26" rx="6"/>
+  <rect class="gpu bar b2" x="200" y="152" width="213" height="26" rx="6"/>
+  <text class="v" x="614" y="170">34.8</text>
+</svg>

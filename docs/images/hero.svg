@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" role="img" aria-labelledby="t d">
+  <title id="t">Open Model Fabric</title>
+  <desc id="d">Requests flow from your app through Open Model Fabric to interchangeable engines: Ollama, vLLM, any OpenAI-compatible server, or a mock with no GPU.</desc>
+  <style>
+    .bg { fill: #f8fafc; }
+    .card { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1; }
+    .core { fill: #eef2ff; stroke: #6366f1; stroke-width: 1.5; }
+    .h { font: 600 26px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0f172a; }
+    .s { font: 400 14px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #475569; }
+    .l { font: 600 14px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #0f172a; }
+    .m { font: 400 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #64748b; }
+    .wire { stroke: #cbd5e1; stroke-width: 2; fill: none; }
+    .pulse { fill: #6366f1; }
+    .p2 { fill: #10b981; }
+    .dot { fill: #10b981; }
+    .flow { offset-rotate: 0deg; animation: move 2.4s linear infinite; }
+    .f1 { offset-path: path("M180 150 L370 150"); }
+    .f2 { offset-path: path("M590 150 C 650 150, 650 70, 720 70"); animation-delay: 1.2s; }
+    .f3 { offset-path: path("M590 150 C 650 150, 650 125, 720 125"); animation-delay: 1.5s; }
+    .f4 { offset-path: path("M590 150 C 650 150, 650 180, 720 180"); animation-delay: 1.8s; }
+    .f5 { offset-path: path("M590 150 C 650 150, 650 235, 720 235"); animation-delay: 2.1s; }
+    .blink { animation: blink 2.4s ease-in-out infinite; }
+    @keyframes move { 0% { offset-distance: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+    @keyframes blink { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .flow, .blink { animation: none; } .flow { opacity: 0; } }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .card { fill: #161b22; stroke: #30363d; }
+      .core { fill: #1e1b4b; stroke: #818cf8; }
+      .h, .l { fill: #f0f6fc; }
+      .s { fill: #9da7b3; }
+      .m { fill: #8b949e; }
+      .wire { stroke: #30363d; }
+      .pulse { fill: #818cf8; }
+    }
+  </style>
+  <rect class="bg" width="960" height="300" rx="16"/>
+
+  <!-- your app -->
+  <rect class="card" x="40" y="110" width="140" height="80" rx="12"/>
+  <text class="l" x="110" y="146" text-anchor="middle">Your app</text>
+  <text class="m" x="110" y="168" text-anchor="middle">UI · SDK · REST</text>
+
+  <!-- core -->
+  <rect class="core" x="370" y="60" width="220" height="180" rx="16"/>
+  <text class="h" x="480" y="112" text-anchor="middle">Open Model</text>
+  <text class="h" x="480" y="144" text-anchor="middle">Fabric</text>
+  <text class="s" x="480" y="176" text-anchor="middle">route · stream · verify</text>
+  <text class="s" x="480" y="198" text-anchor="middle">benchmark · secure</text>
+
+  <!-- wires -->
+  <path class="wire" d="M180 150 L370 150"/>
+  <path class="wire" d="M590 150 C 650 150, 650 70, 720 70"/>
+  <path class="wire" d="M590 150 C 650 150, 650 125, 720 125"/>
+  <path class="wire" d="M590 150 C 650 150, 650 180, 720 180"/>
+  <path class="wire" d="M590 150 C 650 150, 650 235, 720 235"/>
+
+  <!-- engines -->
+  <g>
+    <rect class="card" x="720" y="48" width="200" height="44" rx="10"/>
+    <circle class="dot blink" cx="740" cy="70" r="5"/>
+    <text class="l" x="756" y="75">Ollama</text>
+    <text class="m" x="840" y="75">laptop CPU</text>
+  </g>
+  <g>
+    <rect class="card" x="720" y="103" width="200" height="44" rx="10"/>
+    <circle class="dot blink" cx="740" cy="125" r="5" style="animation-delay:.6s"/>
+    <text class="l" x="756" y="130">vLLM</text>
+    <text class="m" x="840" y="130">GPU box</text>
+  </g>
+  <g>
+    <rect class="card" x="720" y="158" width="200" height="44" rx="10"/>
+    <circle class="dot blink" cx="740" cy="180" r="5" style="animation-delay:1.2s"/>
+    <text class="l" x="756" y="185">OpenAI API</text>
+    <text class="m" x="856" y="185">any</text>
+  </g>
+  <g>
+    <rect class="card" x="720" y="213" width="200" height="44" rx="10"/>
+    <circle class="dot blink" cx="740" cy="235" r="5" style="animation-delay:1.8s"/>
+    <text class="l" x="756" y="240">Mock</text>
+    <text class="m" x="840" y="240">no GPU</text>
+  </g>
+
+  <!-- moving requests -->
+  <circle class="pulse flow f1" r="6"/>
+  <circle class="p2 flow f2" r="5"/>
+  <circle class="p2 flow f3" r="5"/>
+  <circle class="p2 flow f4" r="5"/>
+  <circle class="p2 flow f5" r="5"/>
+</svg>

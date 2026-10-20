@@ -46,7 +46,10 @@ export interface ToolResult {
 type RequestMessage = ChatRequest["messages"][number];
 
 function newRequestId(): string {
-  return `ui_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  // crypto.randomUUID exists only in secure contexts (HTTPS or localhost); getRandomValues
+  // also works when the UI is opened over plain HTTP by LAN address or host name.
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return `ui_${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
 export function fromConversation(conversation: Conversation): UiMessage[] {

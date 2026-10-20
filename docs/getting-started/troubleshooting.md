@@ -7,6 +7,8 @@ logs, so search the logs for it.
 
 | Symptom / error code | Likely cause | Fix |
 |---|---|---|
+| Compose: `required variable OMF_ADMIN_TOKEN is missing a value` although `.env` sets it | Compose reads `.env` from the compose file's folder, not the repository root | Pass `--env-file .env` to every `docker compose -f infrastructure/compose/docker-compose.yml …` command |
+| Compose: `Bind for 0.0.0.0:8080 failed: port is already allocated` | Another program or container uses port 8080 | Stop it, or map another host port with a small override file passed as an extra `-f` (see below) |
 | `configuration_error: secrets must not be stored in configuration files` at startup | A key such as `api_key`, `token` or `password` has a literal value in YAML | Use `api_key_ref: env:NAME` (or `file:/run/secrets/name`) and set the variable on the API host |
 | `configuration_error … auth.mode=none is only allowed when binding to localhost` | `server.host` is not loopback while auth is off | Use `127.0.0.1`, or configure `auth.mode: api_key` with a token |
 | `configuration_error … environment variable X is not set and has no default` | `${X}` in a profile without `:-default` | Export `X` or add a default: `${X:-value}` |
@@ -28,6 +30,18 @@ logs, so search the logs for it.
 | Colab environment shows `offline` | No endpoint registered, or the notebook runtime stopped | Expected. The platform keeps working with other providers; the notebook runs standalone |
 | Google Drive storage `down` | Missing `GDRIVE_SERVICE_ACCOUNT_JSON`, folder not shared with the service account | Share the folder with the service-account e-mail; check the secret reference |
 | `database is locked` with SQLite | Several API processes share one SQLite file | Run one replica on SQLite, or use PostgreSQL (`metadata.url_ref`) |
+
+## Using another host port with Compose
+
+Save as `port.override.yml` (any folder) and add `-f port.override.yml` after the main
+compose file in every command; the UI is then on http://localhost:8081:
+
+```yaml
+services:
+  api:
+    ports: !override
+      - "127.0.0.1:8081:8080"
+```
 
 ## Logs
 
