@@ -38,6 +38,7 @@ from omf.core.domain.models import (
     ProviderDefinition,
     ResponseFormat,
     Role,
+    ToolDefinition,
     new_id,
     utcnow,
 )
@@ -374,6 +375,40 @@ class ModelRegistryService:
                     ok(Capability.STRUCTURED_OUTPUT, "JSON mode returned parseable JSON")
                 except (OMFError, ValueError) as exc:
                     fail(Capability.STRUCTURED_OUTPUT, f"JSON mode check failed: {exc}")
+
+            if caps.supports(Capability.TOOL_CALLING):
+                tool = ToolDefinition(
+                    name="get_weather",
+                    description="Get the current weather for a city",
+                    parameters={
+                        "type": "object",
+                        "properties": {"city": {"type": "string"}},
+                        "required": ["city"],
+                    },
+                )
+                tool_req = InferenceRequest(
+                    request_id=new_id("probe"),
+                    model=deployment.provider_model,
+                    messages=[
+                        ChatMessage(
+                            role=Role.USER,
+                            content="What is the weather in Paris? Use the get_weather tool.",
+                        )
+                    ],
+                    params=GenerationParams(max_tokens=128, temperature=0),
+                    tools=[tool],
+                )
+                try:
+                    result = await adapter.generate(tool_req)
+                    call = next((c for c in result.tool_calls if c.name == tool.name), None)
+                    if call is None:
+                        fail(Capability.TOOL_CALLING, "model answered without calling the tool")
+                    elif not isinstance(json.loads(call.arguments), dict):
+                        fail(Capability.TOOL_CALLING, "tool arguments are not a JSON object")
+                    else:
+                        ok(Capability.TOOL_CALLING, f"called {tool.name} with {call.arguments}")
+                except (OMFError, ValueError) as exc:
+                    fail(Capability.TOOL_CALLING, f"tool call check failed: {exc}")
 
         for cap in deployment.capabilities.claims:
             if cap.capability.value not in {c["capability"] for c in checks}:

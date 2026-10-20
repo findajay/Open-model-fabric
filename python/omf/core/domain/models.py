@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, computed_field, field_validator
+from pydantic import ConfigDict, Field, computed_field, field_validator
 
 from omf.core.domain.base import DomainModel
 from omf.core.domain.capabilities import Capability, CapabilitySet, Modality
@@ -364,6 +364,7 @@ class Role(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
+    TOOL = "tool"
 
 
 class TextPart(DomainModel):
@@ -390,9 +391,45 @@ class ImagePart(DomainModel):
 ContentPart = Annotated[TextPart | ImagePart, Field(discriminator="type")]
 
 
+TOOL_NAME_PATTERN = r"^[a-zA-Z0-9_-]{1,64}$"
+
+
+class ToolDefinition(DomainModel):
+    """A function the model may ask the *caller* to run. OMF never executes tools."""
+
+    model_config = ConfigDict(extra="forbid", json_schema_serialization_defaults_required=True)
+
+    name: str = Field(pattern=TOOL_NAME_PATTERN)
+    description: str | None = Field(default=None, max_length=4000)
+    parameters: dict[str, Any] = Field(
+        default_factory=lambda: {"type": "object", "properties": {}},
+        description="JSON Schema of the arguments; must describe an object",
+    )
+
+    @field_validator("parameters")
+    @classmethod
+    def _object_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
+        if v.get("type", "object") != "object":
+            raise ValueError('tool parameters must be a JSON Schema with "type": "object"')
+        return v
+
+
+class ToolCall(DomainModel):
+    """A model's request to call a tool. ``arguments`` is the JSON text the model produced
+    (it may be invalid JSON; callers must validate it before executing anything)."""
+
+    id: str = Field(min_length=1, max_length=128)
+    name: str = Field(min_length=1, max_length=64)
+    arguments: str = Field(default="{}", max_length=200_000)
+
+
 class ChatMessage(DomainModel):
     role: Role
     content: str | list[ContentPart]
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    """Assistant messages only: tools the model asked to call."""
+    tool_call_id: str | None = None
+    """Tool messages only: the call this message answers."""
     id: str = Field(default_factory=lambda: new_id("msg"))
     created_at: datetime = Field(default_factory=utcnow)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -429,6 +466,17 @@ class InferenceRequest(DomainModel):
     model: str  # provider-native model name
     messages: list[ChatMessage]
     params: GenerationParams = Field(default_factory=GenerationParams)
+    tools: list[ToolDefinition] = Field(default_factory=list)
+    tool_choice: str = "auto"
+    """``auto``, ``none``, ``required`` or the name of one tool."""
+
+    def tool_name_for(self, call_id: str) -> str | None:
+        """Name of the tool an earlier assistant message called with ``call_id``."""
+        for message in self.messages:
+            for call in message.tool_calls:
+                if call.id == call_id:
+                    return call.name
+        return None
 
 
 class TokenUsage(DomainModel):
@@ -442,12 +490,15 @@ class GenerationChunk(DomainModel):
     """Adapter-level stream item. Adapters normalise engine formats into this shape."""
 
     delta: str = ""
+    tool_calls: list[ToolCall] = Field(default_factory=list)
+    """Complete tool calls (adapters assemble streamed fragments before yielding)."""
     finish_reason: str | None = None
     usage: TokenUsage | None = None
 
 
 class GenerationResult(DomainModel):
     content: str
+    tool_calls: list[ToolCall] = Field(default_factory=list)
     finish_reason: str | None = None
     usage: TokenUsage | None = None
 

@@ -27,6 +27,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
 
+from tests.emulators import _tools
 from tests.emulators._disconnect import until_disconnect
 
 MODELS: dict[str, dict[str, Any]] = {
@@ -158,7 +159,41 @@ def create_app(state: EmulatorState | None = None) -> Starlette:
             )
         if "completion" not in MODELS[model]["capabilities"]:
             return JSONResponse({"error": f'"{model}" does not support chat'}, status_code=400)
-        words = _words(_reply(model, body))
+        if body.get("tools") and "tools" not in MODELS[model]["capabilities"]:
+            return JSONResponse(
+                {"error": f"registry.ollama.ai/library/{model} does not support tools"},
+                status_code=400,
+            )
+        call = _tools.plan_call(body)
+        if call is not None:
+            # Ollama: complete call in one (non-final) message, arguments as an object,
+            # no call id, and done_reason "stop" on the final chunk.
+            message = {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{"function": {"name": call[0], "arguments": call[1]}}],
+            }
+            done = {
+                "model": model,
+                "created_at": _now(),
+                "message": {"role": "assistant", "content": ""},
+                "done": True,
+                "done_reason": "stop",
+                "prompt_eval_count": 10,
+                "eval_count": 5,
+            }
+            if not body.get("stream", True):
+                return JSONResponse({**done, "message": message})
+            lines = [
+                {"model": model, "created_at": _now(), "message": message, "done": False},
+                done,
+            ]
+            return StreamingResponse(
+                iter([json.dumps(x) + "\n" for x in lines]), media_type="application/x-ndjson"
+            )
+        words = _words(
+            _tools.result_text(body.get("messages", []), "Ollama emulator") or _reply(model, body)
+        )
         limit = (body.get("options") or {}).get("num_predict")
         if limit:
             words = words[: int(limit)]

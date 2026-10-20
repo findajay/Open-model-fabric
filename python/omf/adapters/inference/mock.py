@@ -15,7 +15,7 @@ import math
 import re
 import time
 from collections.abc import AsyncGenerator
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -41,7 +41,9 @@ from omf.core.domain.models import (
     ProviderHealth,
     ProviderOperation,
     ResponseFormat,
+    Role,
     TokenUsage,
+    ToolCall,
     utcnow,
 )
 from omf.core.ports.inference import InferenceProvider
@@ -62,6 +64,7 @@ class MockModelConfig(BaseModel):
             Capability.CHAT,
             Capability.TEXT_GENERATION,
             Capability.STRUCTURED_OUTPUT,
+            Capability.TOOL_CALLING,
         ]
     )
     dimensions: int = Field(default=64, ge=2, le=4096)
@@ -143,19 +146,39 @@ class MockInferenceAdapter(InferenceProvider):
 
     async def generate(self, request: InferenceRequest) -> GenerationResult:
         parts: list[str] = []
+        calls = []
         finish = None
         usage = None
         async for chunk in self.stream_generate(request):
             parts.append(chunk.delta)
+            calls.extend(chunk.tool_calls)
             finish = chunk.finish_reason or finish
             usage = chunk.usage or usage
-        return GenerationResult(content="".join(parts), finish_reason=finish, usage=usage)
+        return GenerationResult(
+            content="".join(parts), tool_calls=calls, finish_reason=finish, usage=usage
+        )
 
     async def stream_generate(
         self, request: InferenceRequest
     ) -> AsyncGenerator[GenerationChunk, None]:
         self._check_outage()
-        self._model(request.model, Capability.CHAT)
+        model = self._model(request.model, Capability.CHAT)
+        calls = self._tool_calls(request, model)
+        if calls:
+            await asyncio.sleep(self._config.first_token_delay_ms / 1000)
+            yield GenerationChunk(tool_calls=calls)
+            prompt_tokens = sum(len(_tokens(m.text())) for m in request.messages)
+            completion = sum(len(_tokens(c.arguments)) for c in calls)
+            yield GenerationChunk(
+                finish_reason="tool_calls",
+                usage=TokenUsage(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion,
+                    total_tokens=prompt_tokens + completion,
+                    source="provider",
+                ),
+            )
+            return
         text = self._respond(request)
         tokens = _tokens(text)
         if request.params.max_tokens is not None:
@@ -237,7 +260,44 @@ class MockInferenceAdapter(InferenceProvider):
                 details={"provider_id": self.provider_id},
             )
 
+    def _tool_calls(self, request: InferenceRequest, model: MockModelConfig) -> list[ToolCall]:
+        """Call a tool when tools are offered and the conversation ends with a user turn.
+
+        Deterministic: the named tool (``tool_choice``) or the first one, with arguments
+        filled from the schema's required properties.
+        """
+        if not request.tools or request.tool_choice == "none" or not request.messages:
+            return []
+        if Capability.TOOL_CALLING not in model.capabilities:
+            raise CapabilityNotSupported(
+                f"mock model {model.name!r} does not support tool_calling",
+                details={"model": model.name, "missing": ["tool_calling"]},
+            )
+        if request.messages[-1].role != Role.USER:
+            return []  # tool results came back: answer in text
+        tool = next((t for t in request.tools if t.name == request.tool_choice), request.tools[0])
+        prompt = request.messages[-1].text().strip()[:100]
+        properties = tool.parameters.get("properties") or {}
+        arguments = {
+            name: _example_value(properties.get(name) or {}, prompt)
+            for name in tool.parameters.get("required") or list(properties)[:1]
+        }
+        return [
+            ToolCall(
+                id=f"call_{request.request_id}_0",
+                name=tool.name,
+                arguments=json.dumps(arguments),
+            )
+        ]
+
     def _respond(self, request: InferenceRequest) -> str:
+        if request.messages and request.messages[-1].role == Role.TOOL:
+            results = [m for m in request.messages if m.role == Role.TOOL]
+            lines = [f"**Mock response** from `{request.model}` using tool results:", ""]
+            for m in results:
+                name = request.tool_name_for(m.tool_call_id or "") or "tool"
+                lines.append(f"- `{name}` returned: {m.text()[:200]}")
+            return "\n".join(lines)
         last = next((m for m in reversed(request.messages) if m.role.value == "user"), None)
         prompt = last.text().strip() if last else ""
         images = len(last.images()) if last else 0
@@ -262,6 +322,21 @@ class MockInferenceAdapter(InferenceProvider):
             "```",
         ]
         return "\n".join(lines)
+
+
+def _example_value(schema: dict[str, Any], prompt: str) -> Any:
+    if schema.get("enum"):
+        return schema["enum"][0]
+    kind = schema.get("type")
+    if kind in ("integer", "number"):
+        return 1
+    if kind == "boolean":
+        return True
+    if kind == "array":
+        return []
+    if kind == "object":
+        return {}
+    return prompt or "example"
 
 
 def _hashed_embedding(text: str, dims: int) -> list[float]:

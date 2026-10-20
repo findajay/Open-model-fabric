@@ -24,9 +24,9 @@ and multiply test effort.
 
 ## Consequences
 - New OpenAI-compatible engines work without code changes.
-- Engines that need non-standard behaviour (tool-call formats, multimodal quirks) may
-  later need options or a new adapter. Tool-call request shapes are not implemented yet;
-  `tool_calling` is only a declarable capability.
+- Engines that need non-standard behaviour (multimodal quirks, unusual tool-call
+  formats) may later need options or a new adapter. Tool calls use the standard
+  `tools` / `tool_calls` shape, including streamed fragments ([ADR-0013](0013-tool-calling-passthrough.md)).
 - Tests run against a protocol emulator (`tests/emulators/openai_emulator.py`), not a
   real vLLM server.
 
