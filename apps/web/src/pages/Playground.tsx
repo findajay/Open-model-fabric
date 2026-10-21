@@ -237,7 +237,11 @@ export function PlaygroundPage() {
   };
 
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [chat.messages]);
+  // Block body: newer Chromium returns a Promise from scrollIntoView, and an effect
+  // must not return anything but a cleanup function.
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ block: "end" });
+  }, [chat.messages]);
 
   async function openConversation(id: string) {
     const conversation = await api.conversation(id);
