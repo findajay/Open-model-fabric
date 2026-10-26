@@ -18,7 +18,7 @@ COPY apps/web/ apps/web/
 RUN pnpm --filter @omf/web exec vite build
 
 # ---------------------------------------------------------------- python deps
-FROM python:3.13.16-slim AS api-build
+FROM python:3.15.0-slim AS api-build
 COPY --from=ghcr.io/astral-sh/uv:0.11.32 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never
 WORKDIR /app
@@ -29,7 +29,7 @@ COPY apps/api/ apps/api/
 RUN uv sync --frozen --no-dev --no-editable --extra postgres --extra s3 --extra gdrive --extra otel --extra oidc
 
 # ---------------------------------------------------------------- runtime
-FROM python:3.13.16-slim AS runtime
+FROM python:3.15.0-slim AS runtime
 LABEL org.opencontainers.image.title="open-model-fabric" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/findajay/Open-model-fabric"
