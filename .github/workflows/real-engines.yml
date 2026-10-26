@@ -36,7 +36,7 @@ jobs:
       OMF_TEST_OLLAMA_CHAT_MODEL: ${{ matrix.chat }}
       OMF_TEST_OLLAMA_EMBED_MODEL: ${{ matrix.embed }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Model cache
         uses: actions/cache@v4
         with:
@@ -88,7 +88,7 @@ jobs:
       OMF_TEST_LLAMACPP_CHAT_MODEL: qwen2.5-0.5b-instruct
       OMF_TEST_LLAMACPP_EMBED_MODEL: nomic-embed-text-v1.5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Model cache
         uses: actions/cache@v4
         with:

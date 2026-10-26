@@ -40,7 +40,7 @@ jobs:
     env:
       OMF_TEST_AZURITE_URL: http://127.0.0.1:10000/devstoreaccount1
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Start Azurite (blob service)
         run: |
           docker run -d --name azurite -p 10000:10000 \
@@ -76,7 +76,7 @@ jobs:
       OMF_TEST_MINIO_ACCESS_KEY: omfminio
       OMF_TEST_MINIO_SECRET_KEY: omfminio-secret
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Start MinIO
         run: |
           docker run -d --name minio -p 9000:9000 \
