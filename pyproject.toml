@@ -29,7 +29,7 @@ dependencies = [
 # Drive v3 REST API with httpx; google-auth is only used to mint access tokens.
 gdrive = ["google-auth==2.62.0", "requests==2.34.2"]
 # S3-compatible artifact storage (AWS S3, MinIO, ...).
-s3 = ["boto3==1.43.115"]
+s3 = ["boto3==1.43.118"]
 # OIDC (SSO) bearer-token validation: JWT signatures against the issuer's JWKS.
 oidc = ["pyjwt[crypto]==2.15.1"]
 # PostgreSQL metadata repository.
