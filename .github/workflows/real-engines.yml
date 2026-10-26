@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Model cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/ollama-models
           key: ollama-models-${{ matrix.chat }}-${{ matrix.embed }}
@@ -90,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Model cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/gguf
           key: gguf-${{ env.CHAT_FILE }}-${{ env.EMBED_FILE }}
