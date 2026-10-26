@@ -13,7 +13,7 @@ classifiers = [
 ]
 # Runtime dependencies are pinned for repeatable builds; uv.lock pins the full tree.
 dependencies = [
-  "fastapi==0.149.0",
+  "fastapi==0.161.1",
   "uvicorn[standard]==0.54.0",
   "pydantic==2.14.1",
   "httpx==0.28.1",
